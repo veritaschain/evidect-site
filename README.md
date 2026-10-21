@@ -5,6 +5,7 @@ Static GitHub Pages site for `evidect.veritaschain.org`.
 - `/`: Japanese AI security research and evidence-design page, adapted from `veritaschain/vcp-site` at `dff42bb`.
 - `/notices/`: existing English security-notice information.
 - `/notices/ja/`: existing Japanese security-notice information.
+- `/support/`: Japanese PHP/WordPress support, approved tax-inclusive pricing and inquiry form.
 - `/ja/`: compatibility redirect for previously shared Japanese notice links.
 
 The homepage preserves the illustrations, accessible motion controls, text-only founder profile, and native Formspree inquiry form. Parent-site navigation uses absolute `veritaschain.org` URLs; page anchors and static assets stay on this host. The English research translation remains on the parent website.
@@ -31,3 +32,9 @@ On 2026-10-22, Xserver's management interface was unavailable due to announced m
 4. Recheck parent-site SEO and the reciprocal language links. In Search Console, inspect the new URL and submit this site's sitemap through the existing domain property when access is available.
 
 The research service remains in development and its VAP/OAP/DAP integration remains at the design stage. Publishing this information page is not a claim of product availability or conformance.
+
+## Support inquiry page
+
+The prices on `/support/` were provided and approved by the owner on 2026-10-22: free initial assessment; PHP/WordPress update JPY 11,000; update-related error support JPY 22,000/hour with the update fee included in a JPY 110,000 total cap; recovery JPY 11,000–110,000; monthly maintenance from JPY 11,000. All prices include tax. Scope, timing, and time calculation are confirmed before paid work.
+
+The form uses the existing native POST endpoint `https://formspree.io/f/xblvzzoo`, retaining Formspree verification and a honeypot. Each service link selects the corresponding inquiry category. The fallback email is `security@veritaschain.org`. No mail credentials, admin login, or uploads are requested. Test submissions must be intercepted locally; production delivery and domain allowlist checks remain separate from browser QA.
