@@ -1,0 +1,38 @@
+/* Motion enhances visible content; no reveal class ever hides text. */
+:root { --vso-ease: cubic-bezier(.22, 1, .36, 1); }
+html { scroll-padding-top: 90px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .vso-motion :is(.btn, .cta-button, .hero-cta a, .vap-home-demo) {
+    transition: translate .22s var(--vso-ease), box-shadow .22s ease, border-color .22s ease, background-color .22s ease;
+  }
+  .vso-motion .hero-content { animation: vso-hero-arrive .7s var(--vso-ease) both; }
+  .vso-motion .hero::before { animation: vso-hero-glow 4s ease-out 1 both; }
+  .vso-motion .vap-home-accent { background-size: 180% 100%; animation: vso-spectrum 3s ease-out 1 both; }
+  .vso-motion .scroll-indicator { animation: vso-guide 1.8s ease-in-out 2; }
+  .vso-motion :is(.feature-card, .use-case-card, .domain-card, .vap-home-card, .vap-home-profile-links > a) {
+    transition: translate .3s var(--vso-ease), border-color .3s ease, box-shadow .3s ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .vso-motion :is(.btn, .cta-button, .hero-cta a, .vap-home-demo):hover { translate: 0 -3px; }
+    .vso-motion :is(.feature-card, .use-case-card, .domain-card, .vap-home-card, .vap-home-profile-links > a):hover { translate: 0 -5px; }
+  }
+  .vso-motion :is(.btn, .cta-button, .hero-cta a, .vap-home-demo):active { translate: 0 0; }
+  @keyframes vso-hero-arrive { from { translate: 0 12px; } to { translate: 0 0; } }
+  @keyframes vso-hero-glow { from { opacity: .25; } to { opacity: .8; } }
+  @keyframes vso-spectrum { from { background-position: 100% 50%; } to { background-position: 0% 50%; } }
+  @keyframes vso-guide { 0%,100% { translate: 0 0; } 50% { translate: 0 4px; } }
+}
+
+:is(a, button, summary):focus-visible { outline: 3px solid #38bdf8; outline-offset: 5px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

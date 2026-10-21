@@ -1,0 +1,62 @@
+/* Homepage founder profile. Content and the LinkedIn link work without JavaScript. */
+.vso-founder {
+  padding: clamp(2.5rem, 5vw, 4rem) 1.25rem;
+  background: #0b1222;
+  color: #e2e8f0;
+  border-bottom: 1px solid #29334b;
+  scroll-margin-top: 90px;
+}
+.vso-founder-card {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border: 1px solid #3b4f71;
+  border-radius: 1.5rem;
+  background: linear-gradient(125deg, #17253c, #101a2c);
+}
+.vso-founder-eyebrow {
+  margin: 0 0 .65rem;
+  color: #93c5fd;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+.vso-founder h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+.vso-founder-local-name { margin: .4rem 0 0; color: #cbd5e1; font-size: 1rem; }
+.vso-founder-role { margin: .8rem 0 1rem; color: #bfdbfe; font-size: .95rem; line-height: 1.65; }
+.vso-founder-bio { margin: 0; max-width: 680px; color: #cbd5e1; font-size: 1rem; line-height: 1.85; }
+.vso-founder-follow { margin: .9rem 0 1.25rem; color: #aebdd0; font-size: .9rem; line-height: 1.7; }
+.vso-founder-link {
+  display: inline-flex;
+  gap: .7rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: .8rem 1.2rem;
+  border: 1px solid #6eb4fb;
+  border-radius: .65rem;
+  background: #0a66c2;
+  color: #fff;
+  font-size: .95rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+.vso-founder-link:hover { background: #004182; border-color: #bfdbfe; color: #fff; }
+.vso-founder-link:focus-visible { outline: 3px solid #c4b5fd; outline-offset: 5px; }
+.vso-founder-link .fa-linkedin { font-size: 1.3rem; }
+.vso-founder-link .fa-arrow-up-right-from-square { font-size: .75rem; }
+@media (max-width: 640px) {
+  .vso-founder-link { display: flex; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vso-founder-link { transition: none; }
+}
