@@ -62,14 +62,14 @@ class SiteTests(unittest.TestCase):
         self.assertIn('data-sr-motion-toggle', text)
 
     def test_metadata_and_sitemap(self):
-        for file in (ROOT / 'index.html', ROOT / 'notices/index.html', ROOT / 'notices/ja/index.html'):
+        for file in (ROOT / 'index.html', ROOT / 'notices/index.html', ROOT / 'notices/ja/index.html', ROOT / 'support/index.html'):
             text = file.read_text()
             import re
             for raw in re.findall(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', text, re.S):
                 self.assertEqual(json.loads(raw)['@context'], 'https://schema.org')
         tree = ET.parse(ROOT / 'sitemap.xml')
         locations = [n.text for n in tree.findall('.//{*}loc')]
-        self.assertEqual(len(locations), 3)
+        self.assertEqual(len(locations), 4)
         self.assertTrue(all(url.startswith('https://evidect.veritaschain.org/') for url in locations))
         self.assertNotIn('https://evidect.veritaschain.org/ja/', locations)
 
