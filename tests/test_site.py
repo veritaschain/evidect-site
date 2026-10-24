@@ -2,6 +2,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 import json
+import re
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -62,16 +63,48 @@ class SiteTests(unittest.TestCase):
         self.assertIn('data-sr-motion-toggle', text)
 
     def test_metadata_and_sitemap(self):
-        for file in (ROOT / 'index.html', ROOT / 'notices/index.html', ROOT / 'notices/ja/index.html', ROOT / 'support/index.html'):
+        for file in ROOT.rglob('*.html'):
             text = file.read_text()
-            import re
             for raw in re.findall(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', text, re.S):
                 self.assertEqual(json.loads(raw)['@context'], 'https://schema.org')
         tree = ET.parse(ROOT / 'sitemap.xml')
         locations = [n.text for n in tree.findall('.//{*}loc')]
-        self.assertEqual(len(locations), 4)
+        self.assertEqual(len(locations), 9)
         self.assertTrue(all(url.startswith('https://evidect.veritaschain.org/') for url in locations))
         self.assertNotIn('https://evidect.veritaschain.org/ja/', locations)
+
+    def test_indexable_pages_have_independent_identity(self):
+        urls = [n.text for n in ET.parse(ROOT / 'sitemap.xml').findall('.//{*}loc')]
+        titles = []
+        for url in urls:
+            file = ROOT / urlsplit(url).path.lstrip('/') / 'index.html'
+            text = file.read_text()
+            page = Page(text)
+            title = re.search(r'<title>(.*?)</title>', text).group(1)
+            titles.append(title)
+            self.assertIn('EVIDECT', title)
+            self.assertNotIn('VSO', title)
+            self.assertEqual(sum(t == 'h1' for t, _ in page.nodes), 1)
+            self.assertEqual([a['href'] for t, a in page.nodes if t == 'link' and a.get('rel') == 'canonical'], [url])
+            self.assertNotIn('noindex', text)
+            self.assertNotIn('vcp-header.js', text)
+            self.assertNotIn('vcp-footer.js', text)
+            for tag in ('header', 'footer'):
+                shared = re.search(fr'<{tag}.*?</{tag}>', text, re.S).group()
+                links = [a['href'] for t, a in Page(shared).nodes if t == 'a']
+                self.assertTrue(links)
+                self.assertTrue(all(link.startswith('/') and not link.startswith('//') for link in links), (file, links))
+        self.assertEqual(len(titles), len(set(titles)))
+
+    def test_general_contact_preserves_safe_form_defaults(self):
+        nodes = Page((ROOT / 'contact/index.html').read_text()).nodes
+        form = next(a for t, a in nodes if t == 'form')
+        self.assertEqual(form['action'], 'https://formspree.io/f/xblvzzoo')
+        self.assertEqual(form['method'].upper(), 'POST')
+        consent = next(a for t, a in nodes if a.get('type') == 'checkbox')
+        self.assertIn('required', consent)
+        self.assertNotIn('checked', consent)
+        self.assertTrue(all(a.get('type') != 'file' for _, a in nodes))
 
     def test_notice_translation_routes(self):
         for file in ['notices/index.html', 'notices/ja/index.html']:

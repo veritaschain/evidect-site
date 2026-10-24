@@ -11,18 +11,18 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EVIDECT｜AIセキュリティ調査の監査証跡・証拠設計 | VAP / VSO</title>
+    <title>EVIDECT｜セキュリティ調査と証拠設計</title>
     <meta name="description" content="AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。">
     <meta name="author" content="VeritasChain Standards Organization (VSO)">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="EVIDECT｜AIセキュリティ調査の監査証跡・証拠設計 | VAP / VSO">
+    <meta property="og:title" content="EVIDECT｜セキュリティ調査と証拠設計">
     <meta property="og:description" content="AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。">
     <meta property="og:type" content="article">
     <meta property="og:locale" content="ja_JP">
     <meta property="og:locale:alternate" content="en_US">
     <meta property="article:published_time" content="2026-10-21">
-    <meta property="article:modified_time" content="2026-10-22">
+    <meta property="article:modified_time" content="2026-10-24">
     <meta property="article:section" content="VAP">
     <meta property="og:url" content="https://evidect.veritaschain.org/">
     <meta property="og:image" content="https://evidect.veritaschain.org/use-cases/security-research/og-image-ja.jpg">
@@ -34,7 +34,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:site" content="@Veritas_chain">
-    <meta name="twitter:title" content="EVIDECT｜AIセキュリティ調査の監査証跡・証拠設計 | VAP / VSO">
+    <meta name="twitter:title" content="EVIDECT｜セキュリティ調査と証拠設計">
     <meta name="twitter:description" content="AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。">
     <meta name="twitter:image" content="https://evidect.veritaschain.org/use-cases/security-research/og-image-ja.jpg">
     <meta name="twitter:image:alt" content="AIセキュリティ調査の証拠設計 — VAPの適用例（設計提案・参考情報・非規範）。OAPの観測記録とDAPの委任記録を組み合わせる設計。">
@@ -45,16 +45,13 @@
     <link rel="alternate" hreflang="x-default" href="https://veritaschain.org/use-cases/security-research/" />
 
     <!-- Favicon -->
-    <link rel="icon" href="/assets/img/logo.png" type="image/png">
-    <link rel="shortcut icon" href="/assets/img/logo.png" type="image/png">
-    <link rel="apple-touch-icon" href="/assets/img/logo.png">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;family=Noto+Sans+JP:wght@300;400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
 
-    <!-- Font Awesome (required by the shared header and footer) -->
+    <!-- Article icons -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 
@@ -65,25 +62,25 @@
     <link href="/use-cases/security-research/security-research.css?v=20261021-5" rel="stylesheet">
     <link href="/assets/css/founder-profile.css?v=20261018-2" rel="stylesheet">
 
-    <!-- VCP Header / Footer Components -->
-    <script src="/assets/js/vcp-header.js?v=20261022" defer></script>
-    <script src="/assets/js/vcp-footer.js" defer></script>
+
+
+
 
     <link rel="canonical" href="https://evidect.veritaschain.org/" />
-    <meta property="og:site_name" content="EVIDECT | VAP / VSO">
+    <meta property="og:site_name" content="EVIDECT">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <script id="site-webpage" type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebPage", "@id": "https://evidect.veritaschain.org/#webpage", "url": "https://evidect.veritaschain.org/", "name": "EVIDECT｜AIセキュリティ調査の監査証跡・証拠設計 | VAP / VSO", "description": "AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。", "inLanguage": "ja", "isPartOf": {"@id": "https://evidect.veritaschain.org/#website"}, "publisher": {"@id": "https://veritaschain.org/#organization"}, "breadcrumb": {"@id": "https://evidect.veritaschain.org/#breadcrumb"}, "primaryImageOfPage": {"@id": "https://evidect.veritaschain.org/#primaryimage"}, "mainEntity": {"@id": "https://evidect.veritaschain.org/#article"}, "datePublished": "2026-10-21", "dateModified": "2026-10-22", "mentions": {"@id": "https://veritaschain.org/#tokachi-kamimura"}}, {"@type": "ImageObject", "@id": "https://evidect.veritaschain.org/#primaryimage", "url": "https://evidect.veritaschain.org/use-cases/security-research/og-image-ja.jpg", "contentUrl": "https://evidect.veritaschain.org/use-cases/security-research/og-image-ja.jpg", "width": 1200, "height": 630, "caption": "AIセキュリティ調査の証拠設計 — VAPの適用例（設計提案・参考情報・非規範）。OAPの観測記録とDAPの委任記録を組み合わせる設計。", "inLanguage": "ja"}, {"@type": "BreadcrumbList", "@id": "https://evidect.veritaschain.org/#breadcrumb", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "ホーム", "item": "https://veritaschain.org/ja/"}, {"@type": "ListItem", "position": 2, "name": "VAP", "item": "https://veritaschain.org/vap/ja/"}, {"@type": "ListItem", "position": 3, "name": "AIセキュリティ調査の証拠設計"}]}, {"@type": "TechArticle", "@id": "https://evidect.veritaschain.org/#article", "headline": "AIセキュリティ調査の証拠設計", "alternativeHeadline": "AIのセキュリティ調査を、結果だけでなく、過程から検証する。", "description": "AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。", "inLanguage": "ja", "genre": "設計提案（参考情報・非規範）", "keywords": "AI security research, AI agent audit trail, vulnerability assessment, evidence provenance, VAP, OAP, DAP", "datePublished": "2026-10-21", "dateModified": "2026-10-22", "author": {"@type": "Organization", "@id": "https://veritaschain.org/#organization", "name": "VeritasChain Standards Organization (VSO)", "url": "https://veritaschain.org/"}, "publisher": {"@type": "Organization", "@id": "https://veritaschain.org/#organization", "name": "VeritasChain Standards Organization (VSO)", "url": "https://veritaschain.org/"}, "mainEntityOfPage": {"@id": "https://evidect.veritaschain.org/#webpage"}, "image": {"@id": "https://evidect.veritaschain.org/#primaryimage"}, "about": [{"@type": "Thing", "name": "Verifiable AI Provenance Framework (VAP)", "url": "https://veritaschain.org/vap/ja/"}, {"@type": "Thing", "name": "Observed Artifact Provenance (OAP)"}, {"@type": "Thing", "name": "Delegated Access Provenance (DAP)"}, {"@type": "Thing", "name": "AIによるセキュリティ調査"}], "isBasedOn": {"@type": "CreativeWork", "name": "Verifiable AI Provenance Framework (VAP) Specification", "version": "1.2.0 (Draft 3)", "url": "https://github.com/veritaschain/vap-spec/blob/47bbeb59e1b3f0163882d473fc6542b07317641f/spec/v1.2/VAP_Framework_Specification.md"}, "hasPart": [{"@id": "https://evidect.veritaschain.org/#faq"}, {"@id": "https://evidect.veritaschain.org/#glossary"}], "citation": ["https://www.nist.gov/news-events/news/2026/09/comments-software-and-agentic-ai-identity-concept-paper", "https://www.cyber.gov.au/advisory/agentic-ai-harnesses", "https://www.cyber.gov.au/publication/careful-adoption-of-agentic-ai-services"]}, {"@type": "FAQPage", "@id": "https://evidect.veritaschain.org/#faq", "inLanguage": "ja", "isPartOf": {"@id": "https://evidect.veritaschain.org/#webpage"}, "mainEntity": [{"@type": "Question", "name": "AIセキュリティ調査の監査証跡には何を残すべきですか？", "acceptedAnswer": {"@type": "Answer", "text": "本提案では、調査の許可と範囲、取得前の許可・拒否判断、実際の要求と応答、技術的評価、通知判断を区別します。それぞれを時刻や完全性を検証するための証拠で結び付け、観測した事実、推論、未確認の条件を分けて記録します。"}}, {"@type": "Question", "name": "VAPはプロンプトインジェクションや不正操作を防げますか？", "acceptedAnswer": {"@type": "Answer", "text": "いいえ。VAPは事後検証のために証拠を記録する枠組みです。プロンプトインジェクション対策、最小権限、ツールの利用制限、人による承認は、実行システム側で実施します。監査証跡は操作の調査を支えますが、その操作を防いだり、所見の正しさを保証したりするものではありません。"}}, {"@type": "Question", "name": "この設計で、AIが見つけた脆弱性が本物だと保証できますか？", "acceptedAnswer": {"@type": "Answer", "text": "いいえ。証拠を検証して確かめられるのは、記録が後から改変されていないかや、所見が元の観測・判断とどう結び付いているかです。脆弱性が実在することや悪用できることは、この設計だけでは保証しません。"}}, {"@type": "Question", "name": "OAPとDAPは何ですか？", "acceptedAnswer": {"@type": "Answer", "text": "どちらもVAP v1.2.0 Draft 3に登録されたWorking Draftです。OAP（Observed Artifact Provenance）は、第三者が公開したWeb上の資料をURLで観測した記録の来歴を扱う領域プロファイルです。DAP（Delegated Access Provenance、通称VAP-AGENT）は、委任された権限の下での、エージェントのアクセス、ツール呼出し、操作、データ移転の来歴を扱う分野横断のケイパビリティです。"}}, {"@type": "Question", "name": "社内でAIに作業を任せれば、対象企業のシステムを調べてもよいのですか？", "acceptedAnswer": {"@type": "Answer", "text": "社内の委任は、第三者のシステムにアクセスする権限を生みません。本設計では、社内の委任と対象組織の許可を別の記録として扱います。また、本設計はアクセス権限を与えるものでも、調査の適法性を保証するものでもありません。"}}, {"@type": "Question", "name": "証拠を記録すれば、禁止された操作を防げますか？", "acceptedAnswer": {"@type": "Answer", "text": "防げません。VAPは事後検証のための枠組みで、AIの動作を阻止・遮断するものではありません。禁止された操作を防ぐには、操作の範囲をシステム側で強制する実行制御が別に必要です。"}}, {"@type": "Question", "name": "EVIDECTは、VAPの認定や独立した検証を受けていますか？", "acceptedAnswer": {"@type": "Answer", "text": "いいえ。EVIDECTはVeritasChain株式会社が開発中のサービスで、VAP・OAP・DAPによる証跡統合は設計段階です。公開された適合試験結果や独立した検証結果はありません。"}}, {"@type": "Question", "name": "この適用設計について意見を送るには？", "acceptedAnswer": {"@type": "Answer", "text": "下部のセキュリティ調査のお問い合わせフォーム、またはstandards@veritaschain.orgをご利用ください。機密情報を含めず、調査フローや設計へのご意見の概要をお知らせください。いただいたご意見は、VAPや各プロファイルの規範的な変更を意味しません。"}}]}, {"@type": "DefinedTermSet", "@id": "https://evidect.veritaschain.org/#glossary", "name": "このページで使う用語", "inLanguage": "ja", "hasDefinedTerm": [{"@type": "DefinedTerm", "name": "来歴（プロベナンス）", "description": "記録やデータが、いつ・どこで・誰によって・どのように作られ、扱われてきたかの経緯。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "委任", "description": "ある主体（プリンシパル）が、別の主体（ここではAIエージェント）に、範囲と期間を決めて作業や権限を任せること。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "検証可能性", "description": "記録を作った当事者を信頼しなくても、第三者が記録の改変の有無や、記録どうしの結び付きを確かめられる性質。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "外部アンカー", "description": "記録の要約値（ハッシュ値）を、記録した者が単独では書き換えられない外部のサービス（タイムスタンプ局や透明性ログなど）に固定すること。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "非規範", "description": "仕様の要件ではなく、理解を助けるための参考情報であること。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}]}, {"@type": "Person", "@id": "https://veritaschain.org/#tokachi-kamimura", "name": "Tokachi Kamimura", "alternateName": "上村 十勝", "jobTitle": "Founder", "url": "https://veritaschain.org/#tokachi-kamimura", "sameAs": ["https://www.linkedin.com/in/tokachi/"], "worksFor": {"@id": "https://veritaschain.org/#organization"}}, {"@type": "WebSite", "@id": "https://evidect.veritaschain.org/#website", "url": "https://evidect.veritaschain.org/", "name": "EVIDECT | VAP / VSO", "inLanguage": "ja", "publisher": {"@id": "https://veritaschain.org/#organization"}}]}</script>
-</head>
+    <script id="site-webpage" type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebPage", "@id": "https://evidect.veritaschain.org/#webpage", "url": "https://evidect.veritaschain.org/", "name": "EVIDECT｜セキュリティ調査と証拠設計", "description": "AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。", "inLanguage": "ja", "isPartOf": {"@id": "https://evidect.veritaschain.org/#website"}, "publisher": {"@id": "https://evidect.veritaschain.org/#operator"}, "breadcrumb": {"@id": "https://evidect.veritaschain.org/#breadcrumb"}, "primaryImageOfPage": {"@id": "https://evidect.veritaschain.org/#primaryimage"}, "mainEntity": {"@id": "https://evidect.veritaschain.org/#article"}, "datePublished": "2026-10-21", "dateModified": "2026-10-24", "mentions": {"@id": "https://veritaschain.org/#tokachi-kamimura"}}, {"@type": "ImageObject", "@id": "https://evidect.veritaschain.org/#primaryimage", "url": "https://evidect.veritaschain.org/use-cases/security-research/og-image-ja.jpg", "contentUrl": "https://evidect.veritaschain.org/use-cases/security-research/og-image-ja.jpg", "width": 1200, "height": 630, "caption": "AIセキュリティ調査の証拠設計 — VAPの適用例（設計提案・参考情報・非規範）。OAPの観測記録とDAPの委任記録を組み合わせる設計。", "inLanguage": "ja"}, {"@type": "BreadcrumbList", "@id": "https://evidect.veritaschain.org/#breadcrumb", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "EVIDECT", "item": "https://evidect.veritaschain.org/"}, {"@type": "ListItem", "position": 2, "name": "調査と証拠設計", "item": "https://evidect.veritaschain.org/methodology/"}, {"@type": "ListItem", "position": 3, "name": "AIセキュリティ調査の証拠設計"}]}, {"@type": "TechArticle", "@id": "https://evidect.veritaschain.org/#article", "headline": "AIセキュリティ調査の証拠設計", "alternativeHeadline": "AIのセキュリティ調査を、結果だけでなく、過程から検証する。", "description": "AIセキュリティ調査の監査証跡を、VAP・OAP・DAPで設計するための適用例。権限・観測・操作・所見のつなぎ方、最新の公的セキュリティ指針、検証できることの限界を解説。証拠設計や調査フローのご相談も受け付けています。", "inLanguage": "ja", "genre": "設計提案（参考情報・非規範）", "keywords": "AI security research, AI agent audit trail, vulnerability assessment, evidence provenance, VAP, OAP, DAP", "datePublished": "2026-10-21", "dateModified": "2026-10-24", "author": {"@type": "Organization", "@id": "https://veritaschain.org/#organization", "name": "VeritasChain Standards Organization (VSO)", "url": "https://veritaschain.org/"}, "publisher": {"@id": "https://evidect.veritaschain.org/#operator"}, "mainEntityOfPage": {"@id": "https://evidect.veritaschain.org/#webpage"}, "image": {"@id": "https://evidect.veritaschain.org/#primaryimage"}, "about": [{"@type": "Thing", "name": "Verifiable AI Provenance Framework (VAP)", "url": "https://veritaschain.org/vap/ja/"}, {"@type": "Thing", "name": "Observed Artifact Provenance (OAP)"}, {"@type": "Thing", "name": "Delegated Access Provenance (DAP)"}, {"@type": "Thing", "name": "AIによるセキュリティ調査"}], "isBasedOn": {"@type": "CreativeWork", "name": "Verifiable AI Provenance Framework (VAP) Specification", "version": "1.2.0 (Draft 3)", "url": "https://github.com/veritaschain/vap-spec/blob/47bbeb59e1b3f0163882d473fc6542b07317641f/spec/v1.2/VAP_Framework_Specification.md"}, "hasPart": [{"@id": "https://evidect.veritaschain.org/#faq"}, {"@id": "https://evidect.veritaschain.org/#glossary"}], "citation": ["https://www.nist.gov/news-events/news/2026/09/comments-software-and-agentic-ai-identity-concept-paper", "https://www.cyber.gov.au/advisory/agentic-ai-harnesses", "https://www.cyber.gov.au/publication/careful-adoption-of-agentic-ai-services"]}, {"@type": "FAQPage", "@id": "https://evidect.veritaschain.org/#faq", "inLanguage": "ja", "isPartOf": {"@id": "https://evidect.veritaschain.org/#webpage"}, "mainEntity": [{"@type": "Question", "name": "AIセキュリティ調査の監査証跡には何を残すべきですか？", "acceptedAnswer": {"@type": "Answer", "text": "本提案では、調査の許可と範囲、取得前の許可・拒否判断、実際の要求と応答、技術的評価、通知判断を区別します。それぞれを時刻や完全性を検証するための証拠で結び付け、観測した事実、推論、未確認の条件を分けて記録します。"}}, {"@type": "Question", "name": "VAPはプロンプトインジェクションや不正操作を防げますか？", "acceptedAnswer": {"@type": "Answer", "text": "いいえ。VAPは事後検証のために証拠を記録する枠組みです。プロンプトインジェクション対策、最小権限、ツールの利用制限、人による承認は、実行システム側で実施します。監査証跡は操作の調査を支えますが、その操作を防いだり、所見の正しさを保証したりするものではありません。"}}, {"@type": "Question", "name": "この設計で、AIが見つけた脆弱性が本物だと保証できますか？", "acceptedAnswer": {"@type": "Answer", "text": "いいえ。証拠を検証して確かめられるのは、記録が後から改変されていないかや、所見が元の観測・判断とどう結び付いているかです。脆弱性が実在することや悪用できることは、この設計だけでは保証しません。"}}, {"@type": "Question", "name": "OAPとDAPは何ですか？", "acceptedAnswer": {"@type": "Answer", "text": "どちらもVAP v1.2.0 Draft 3に登録されたWorking Draftです。OAP（Observed Artifact Provenance）は、第三者が公開したWeb上の資料をURLで観測した記録の来歴を扱う領域プロファイルです。DAP（Delegated Access Provenance、通称VAP-AGENT）は、委任された権限の下での、エージェントのアクセス、ツール呼出し、操作、データ移転の来歴を扱う分野横断のケイパビリティです。"}}, {"@type": "Question", "name": "社内でAIに作業を任せれば、対象企業のシステムを調べてもよいのですか？", "acceptedAnswer": {"@type": "Answer", "text": "社内の委任は、第三者のシステムにアクセスする権限を生みません。本設計では、社内の委任と対象組織の許可を別の記録として扱います。また、本設計はアクセス権限を与えるものでも、調査の適法性を保証するものでもありません。"}}, {"@type": "Question", "name": "証拠を記録すれば、禁止された操作を防げますか？", "acceptedAnswer": {"@type": "Answer", "text": "防げません。VAPは事後検証のための枠組みで、AIの動作を阻止・遮断するものではありません。禁止された操作を防ぐには、操作の範囲をシステム側で強制する実行制御が別に必要です。"}}, {"@type": "Question", "name": "EVIDECTは、VAPの認定や独立した検証を受けていますか？", "acceptedAnswer": {"@type": "Answer", "text": "いいえ。EVIDECTはVeritasChain株式会社が開発中のサービスで、VAP・OAP・DAPによる証跡統合は設計段階です。公開された適合試験結果や独立した検証結果はありません。"}}, {"@type": "Question", "name": "この適用設計について意見を送るには？", "acceptedAnswer": {"@type": "Answer", "text": "下部のセキュリティ調査のお問い合わせフォーム、またはstandards@veritaschain.orgをご利用ください。機密情報を含めず、調査フローや設計へのご意見の概要をお知らせください。いただいたご意見は、VAPや各プロファイルの規範的な変更を意味しません。"}}]}, {"@type": "DefinedTermSet", "@id": "https://evidect.veritaschain.org/#glossary", "name": "このページで使う用語", "inLanguage": "ja", "hasDefinedTerm": [{"@type": "DefinedTerm", "name": "来歴（プロベナンス）", "description": "記録やデータが、いつ・どこで・誰によって・どのように作られ、扱われてきたかの経緯。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "委任", "description": "ある主体（プリンシパル）が、別の主体（ここではAIエージェント）に、範囲と期間を決めて作業や権限を任せること。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "検証可能性", "description": "記録を作った当事者を信頼しなくても、第三者が記録の改変の有無や、記録どうしの結び付きを確かめられる性質。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "外部アンカー", "description": "記録の要約値（ハッシュ値）を、記録した者が単独では書き換えられない外部のサービス（タイムスタンプ局や透明性ログなど）に固定すること。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}, {"@type": "DefinedTerm", "name": "非規範", "description": "仕様の要件ではなく、理解を助けるための参考情報であること。", "inDefinedTermSet": {"@id": "https://evidect.veritaschain.org/#glossary"}}]}, {"@type": "Person", "@id": "https://veritaschain.org/#tokachi-kamimura", "name": "Tokachi Kamimura", "alternateName": "上村 十勝", "jobTitle": "Founder", "url": "https://veritaschain.org/#tokachi-kamimura", "sameAs": ["https://www.linkedin.com/in/tokachi/"], "worksFor": {"@id": "https://veritaschain.org/#organization"}}, {"@type": "WebSite", "@id": "https://evidect.veritaschain.org/#website", "url": "https://evidect.veritaschain.org/", "name": "EVIDECT", "inLanguage": "ja", "publisher": {"@id": "https://evidect.veritaschain.org/#operator"}}, {"@type": "Organization", "@id": "https://evidect.veritaschain.org/#operator", "name": "VeritasChain株式会社", "alternateName": "VeritasChain Co., Ltd.", "url": "https://evidect.veritaschain.org/about/"}]}</script>
+<link rel="icon" type="image/svg+xml" href="/assets/img/evidect-mark.svg"><link rel="stylesheet" href="/assets/css/evidect-site.css?v=20261024"><script src="/assets/js/evidect-site.js?v=20261024" defer></script></head>
 <body class="sr-page" data-motion="off">
     <a class="sr-skip" href="#main">本文へ移動</a>
 
-    <!-- VCP Header (this page is available in English and Japanese) -->
-    <vcp-header theme="dark" lang="ja" available-langs="en,ja"></vcp-header>
+    <!-- EVIDECT navigation -->
+    <header class="ev-header"><div class="ev-bar"><a class="ev-brand" href="/" aria-label="EVIDECT ホーム"><svg viewBox="0 0 36 40" fill="none" aria-hidden="true"><path d="M6 3h24v34H6zM12 21l6 6L29 11" stroke="currentColor" stroke-width="2.5"/></svg><span>EVIDECT<small>EVIDENCE · SECURITY · ACTION</small></span></a><button class="ev-menu" type="button" aria-expanded="false" aria-controls="ev-nav">メニュー ☰</button><nav class="ev-nav" id="ev-nav" aria-label="メインナビゲーション"><a href="/services/">サービス</a><a href="/methodology/">調査と証拠設計</a><a href="/notices/ja/">通知を受け取った方へ</a><a href="/about/">運営情報</a><a href="/contact/" class="ev-contact">お問い合わせ</a></nav></div></header>
 
     <nav class="sr-breadcrumb" aria-label="パンくずリスト">
         <ol>
-            <li><a href="https://veritaschain.org/ja/">ホーム</a></li>
-            <li><a href="https://veritaschain.org/vap/ja/">VAP</a></li>
+            <li><a href="/">EVIDECT</a></li>
+            <li><a href="/methodology/">調査と証拠設計</a></li>
             <li><span aria-current="page">AIセキュリティ調査の証拠設計</span></li>
         </ol>
     </nav>
@@ -94,7 +91,7 @@
         <section class="hero sr-hero" aria-labelledby="sr-title">
             <div class="hero-content sr-hero-grid">
                 <div class="sr-hero-copy">
-                    <p class="sr-eyebrow">EVIDECT · VAP 適用例 · AIセキュリティ調査の証拠設計</p>
+                    <p class="sr-eyebrow">EVIDECT · SECURITY RESEARCH &amp; EVIDENCE DESIGN</p>
                     <h1 class="hero-title" id="sr-title"><span class="sr-phrase">AIのセキュリティ調査を、</span><span class="sr-phrase">結果だけでなく、</span><span class="sr-phrase">過程から検証する。</span></h1>
                     <ul class="sr-chips" aria-label="このページの状態">
                         <li class="sr-chip sr-chip--proposal">状態：設計提案</li>
@@ -120,8 +117,8 @@
 
         <nav class="sr-page-nav" aria-label="このページの内容">
             <div class="sr-wrap">
-                <p class="sr-byline">発行：<a href="https://veritaschain.org/vso/ja/">VeritasChain Standards Organization（VSO）</a> · 更新：<time datetime="2026-10-22">2026年10月22日</time></p>
-                <ul><li><a href="#security-context">最近のセキュリティ動向</a></li><li><a href="#design">証拠の設計</a></li><li><a href="#flow">調査フロー</a></li><li><a href="#limits">検証の限界</a></li><li><a href="#faq">よくある質問</a></li><li><a href="#contact">お問い合わせ</a></li><li><a href="/notices/ja/">通知を受け取った方へ</a></li><li><a href="/support/">PHP・WordPress対応／料金</a></li></ul>
+                <p class="sr-byline">発行：<a href="https://veritaschain.org/vso/ja/">VeritasChain Standards Organization（VSO）</a> · 更新：<time datetime="2026-10-24">2026年10月24日</time></p>
+                <ul><li><a href="#security-context">最近のセキュリティ動向</a></li><li><a href="#design">証拠の設計</a></li><li><a href="#flow">調査フロー</a></li><li><a href="#limits">検証の限界</a></li><li><a href="#faq">よくある質問</a></li><li><a href="/contact/">お問い合わせ</a></li><li><a href="/notices/ja/">通知を受け取った方へ</a></li><li><a href="/support/">PHP・WordPress対応／料金</a></li></ul>
             </div>
         </nav>
 
@@ -652,7 +649,7 @@
                     <p>本ページで紹介するVAP・OAP・DAPへの対応は、適用設計の提案です。実装状況、試験結果、適合評価の有無は、それぞれ確認できる資料とともに示します。</p>
                     <dl class="sr-kv">
                         <dt>開発主体</dt>
-                        <dd>VeritasChain株式会社（VSOの運営基盤を提供している会社です。<a href="https://veritaschain.org/vso/policies/ja/">VSOの中立性と運営基盤に関する方針</a>・<a href="https://veritaschain.org/company/ja/">会社情報</a>）</dd>
+                        <dd>VeritasChain株式会社（VSOの運営基盤を提供している会社です。<a href="https://veritaschain.org/vso/policies/ja/">VSOの中立性と運営基盤に関する方針</a>・<a href="/about/">会社情報</a>）</dd>
                         <dt>位置づけ</dt>
                         <dd>自社の実装計画です。外部の組織による独立した採用事例ではありません。</dd>
                         <dt>サービス</dt>
@@ -780,7 +777,8 @@
 
                 <h3 class="sr-subhead"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i>変更履歴</h3>
                 <ol class="sr-history" reversed>
-                    <li><time datetime="2026-10-22">2026-10-22</time><span>EVIDECTの日本語トップページとして掲載。既存のセキュリティ通知の案内は<a href="/notices/ja/">専用ページ</a>に掲載。</span></li>
+                    <li><time datetime="2026-10-24">2026-10-24</time> EVIDECT独自のナビゲーションと、サービス・証拠設計・運営情報・お問い合わせ・プライバシーの各ページを追加。</li>
+                        <li><time datetime="2026-10-22">2026-10-22</time><span>EVIDECTの日本語トップページとして掲載。既存のセキュリティ通知の案内は<a href="/notices/ja/">専用ページ</a>に掲載。</span></li>
                     <li><time datetime="2026-10-21">2026-10-21</time><span>最近の公的セキュリティ指針、目次、監査証跡に関するFAQ、お問い合わせフォームを追加。検索・共有向けの情報を更新。</span></li>
                     <li><time datetime="2026-10-21">2026-10-21</time><span>見出し・カードの段階表示、図の浮遊、アニメーションの停止・再開を追加。端末の「動きを減らす」設定に対応。</span></li>
                     <li><time datetime="2026-10-21">2026-10-21</time><span>VSO創設者の紹介セクションを追加。</span></li>
@@ -823,7 +821,7 @@
                         <p class="sr-note">メールでのご連絡や、フォームを利用できない場合は、<a href="mailto:standards@veritaschain.org">standards@veritaschain.org</a>へお送りください。</p>
                     </div>
                     <form class="sr-inquiry-form" id="security-research-inquiry" action="https://formspree.io/f/xblvzzoo" method="POST" accept-charset="UTF-8" aria-labelledby="contact-title" aria-describedby="contact-required contact-service">
-                        <input type="hidden" name="subject" value="Security research inquiry | VAP / VSO">
+                        <input type="hidden" name="subject" value="EVIDECT | Security research inquiry">
                         <input type="hidden" name="source_page" value="https://evidect.veritaschain.org/">
                         <input type="hidden" name="language" value="ja">
                         <div class="sr-form-trap" aria-hidden="true"><label for="contact-website">Leave this field empty</label><input id="contact-website" type="text" name="_gotcha" tabindex="-1" autocomplete="off"></div>
@@ -835,8 +833,8 @@
                         <div class="sr-form-field"><label for="contact-organization">会社・組織名（任意）</label><input id="contact-organization" name="organization" type="text" autocomplete="organization" maxlength="200"></div>
                         <div class="sr-form-field"><label for="contact-topic">お問い合わせの種類 ＊</label><select id="contact-topic" name="inquiry_type" required><option value="" selected disabled>選択してください</option><option value="Evidence design / VAP OAP DAP">証拠設計／VAP・OAP・DAP</option><option value="AI security research workflow">AIセキュリティ調査のフロー</option><option value="EVIDECT integration (design stage)">EVIDECTとの連携（設計段階）</option><option value="Specification feedback / collaboration">仕様へのご意見・研究協力</option><option value="Other inquiry">その他</option></select></div>
                         <div class="sr-form-field"><label for="contact-message">ご相談内容 ＊</label><textarea id="contact-message" name="message" rows="5" maxlength="4000" required aria-describedby="contact-message-help contact-safety" placeholder="現在の調査フロー、残したい記録、ご相談したいことを簡単にご記入ください。初回のご連絡には機密情報を含めないでください。"></textarea><p id="contact-message-help" class="sr-form-help">4,000文字以内。概要だけで構いません。</p></div>
-                        <label class="sr-form-consent" for="contact-consent"><input id="contact-consent" type="checkbox" name="consent" value="Agreed to use of submitted information to respond to this inquiry" required><span><a href="https://veritaschain.org/privacy/ja/">プライバシーポリシー</a>を確認し、VSOが本件への回答のために入力情報を利用することに同意します。＊</span></label>
-                        <p id="contact-service" class="sr-form-help">送信には、VSOのサポートフォームでも利用しているFormspreeを使用します。送信後、同サービスの認証画面や確認画面へ移動する場合があります。</p>
+                        <label class="sr-form-consent" for="contact-consent"><input id="contact-consent" type="checkbox" name="consent" value="Agreed to use of submitted information to respond to this inquiry" required><span><a href="/privacy/">プライバシーポリシー</a>を確認し、VeritasChain株式会社が本件への回答のために入力情報を利用することに同意します。＊</span></label>
+                        <p id="contact-service" class="sr-form-help">送信には、Formspreeを使用します。送信後、同サービスの認証画面や確認画面へ移動する場合があります。</p>
                         <button type="submit" class="btn btn-primary sr-form-submit"><i class="fas fa-paper-plane" aria-hidden="true"></i>お問い合わせを送信</button>
                     </form>
                 </div>
@@ -864,7 +862,7 @@
     </section>
 
     <!-- Footer -->
-    <vcp-footer theme="dark" lang="ja"></vcp-footer>
+    <footer class="ev-footer"><div class="ev-footer-inner"><div><a class="ev-brand" href="/" aria-label="EVIDECT ホーム"><svg viewBox="0 0 36 40" fill="none" aria-hidden="true"><path d="M6 3h24v34H6zM12 21l6 6L29 11" stroke="currentColor" stroke-width="2.5"/></svg><span>EVIDECT<small>EVIDENCE · SECURITY · ACTION</small></span></a><p>確認できた事実と、まだ分からないことを。<br>次の対策につながる、セキュリティと証拠の設計。</p></div><nav aria-label="フッターナビゲーション"><a href="/services/">サービス</a><a href="/support/">PHP・WordPress対応／料金</a><a href="/methodology/">調査と証拠設計</a><a href="/notices/ja/">セキュリティ通知</a><a href="/about/">運営情報</a><a href="/privacy/">プライバシー</a><a href="/contact/">お問い合わせ</a></nav></div><p class="ev-copy">© 2026 EVIDECT · 運営：VeritasChain株式会社 / VeritasChain Co., Ltd.</p></footer>
     <script src="/use-cases/security-research/security-research-motion.js?v=20261021" defer></script>
 </body>
 </html>
