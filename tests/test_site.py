@@ -114,6 +114,15 @@ class SiteTests(unittest.TestCase):
             self.assertNotIn('href="/ja/"', text)
         self.assertIn('0;url=/notices/ja/', (ROOT / 'ja/index.html').read_text())
 
+    def test_withdrawn_commercial_claim_is_not_restated(self):
+        # VSO withdrew the paid-service contract figure on 2026-10-24
+        # (vap-spec disclosures/2026-10-24-commercial-contracts.md).
+        withdrawn = re.compile(r'10件の有償|十件の有償|ten paid|10 paid', re.I)
+        for file in ROOT.rglob('*.html'):
+            if '.git' in file.parts:
+                continue
+            self.assertIsNone(withdrawn.search(file.read_text()), file)
+
 
 if __name__ == '__main__':
     unittest.main()
