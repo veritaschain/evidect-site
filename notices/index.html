@@ -1,19 +1,147 @@
 <!doctype html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EVIDECT | Security risks, grounded in evidence</title><meta name="description" content="EVIDECT shares security information grounded in public sources and external observations. Read the urgent PHP advisory and guidance for notice recipients. Operated by VeritasChain Co., Ltd.">
-<meta name="theme-color" content="#090f18">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PHP Vulnerability Advisory &amp; Security Notices | EVIDECT</title>
+<meta name="description" content="Received an EVIDECT security notice? Find official PHP vulnerability and release information, understand the evidence and its limits, and contact us. Notices are free; purchasing support is optional.">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="author" content="VeritasChain株式会社">
 <link rel="canonical" href="https://evidect.veritaschain.org/notices/">
-<link rel="alternate" hreflang="ja" href="https://evidect.veritaschain.org/notices/ja/"><link rel="alternate" hreflang="en" href="https://evidect.veritaschain.org/notices/"><link rel="alternate" hreflang="x-default" href="https://evidect.veritaschain.org/notices/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="EVIDECT"><meta property="og:title" content="EVIDECT | Security risks, grounded in evidence"><meta property="og:description" content="EVIDECT shares security information grounded in public sources and external observations. Read the urgent PHP advisory and guidance for notice recipients. Operated by VeritasChain Co., Ltd."><meta property="og:url" content="https://evidect.veritaschain.org/notices/"><meta property="og:locale" content="en_US">
-<meta name="twitter:card" content="summary">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EVIDECT">
+<meta property="og:title" content="PHP Vulnerability Advisory &amp; Security Notices | EVIDECT">
+<meta property="og:description" content="Received an EVIDECT security notice? Find official PHP vulnerability and release information, understand the evidence and its limits, and contact us. Notices are free; purchasing support is optional.">
+<meta property="og:url" content="https://evidect.veritaschain.org/notices/">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://evidect.veritaschain.org/assets/img/evidect-social.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="EVIDECT — Evidence · Security · Action">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PHP Vulnerability Advisory &amp; Security Notices | EVIDECT">
+<meta name="twitter:description" content="Received an EVIDECT security notice? Find official PHP vulnerability and release information, understand the evidence and its limits, and contact us. Notices are free; purchasing support is optional.">
+<meta name="twitter:image" content="https://evidect.veritaschain.org/assets/img/evidect-social.png">
+<meta name="twitter:image:alt" content="EVIDECT — Evidence · Security · Action">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+<link rel="icon" type="image/svg+xml" sizes="any" href="/assets/img/evidect-mark.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0b1420">
+<link rel="alternate" hreflang="ja" href="https://evidect.veritaschain.org/notices/ja/">
+<link rel="alternate" hreflang="en" href="https://evidect.veritaschain.org/notices/">
+<link rel="alternate" hreflang="x-default" href="https://evidect.veritaschain.org/notices/">
+<meta property="og:locale:alternate" content="ja_JP">
+<script id="site-webpage" type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://evidect.veritaschain.org/#operator",
+      "name": "VeritasChain株式会社",
+      "legalName": "VeritasChain株式会社",
+      "alternateName": "VeritasChain Co., Ltd.",
+      "url": "https://evidect.veritaschain.org/about/",
+      "email": "info@veritaschain.org",
+      "duns": "698368529",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "JP",
+        "addressRegion": "東京都",
+        "addressLocality": "渋谷区",
+        "streetAddress": "恵比寿西2-4-8"
+      },
+      "brand": {
+        "@id": "https://evidect.veritaschain.org/#brand"
+      }
+    },
+    {
+      "@type": "Brand",
+      "@id": "https://evidect.veritaschain.org/#brand",
+      "name": "EVIDECT",
+      "url": "https://evidect.veritaschain.org/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://evidect.veritaschain.org/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://evidect.veritaschain.org/#website",
+      "url": "https://evidect.veritaschain.org/",
+      "name": "EVIDECT",
+      "inLanguage": [
+        "ja",
+        "en"
+      ],
+      "publisher": {
+        "@id": "https://evidect.veritaschain.org/#operator"
+      }
+    },
+    {
+      "@type": "ImageObject",
+      "@id": "https://evidect.veritaschain.org/#socialimage",
+      "url": "https://evidect.veritaschain.org/assets/img/evidect-social.png",
+      "contentUrl": "https://evidect.veritaschain.org/assets/img/evidect-social.png",
+      "width": 1200,
+      "height": 630,
+      "caption": "EVIDECT — Evidence · Security · Action"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://evidect.veritaschain.org/notices/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "EVIDECT",
+          "item": "https://evidect.veritaschain.org/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Security notices",
+          "item": "https://evidect.veritaschain.org/notices/"
+        }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://evidect.veritaschain.org/notices/#webpage",
+      "url": "https://evidect.veritaschain.org/notices/",
+      "name": "PHP Vulnerability Advisory & Security Notices | EVIDECT",
+      "description": "Received an EVIDECT security notice? Find official PHP vulnerability and release information, understand the evidence and its limits, and contact us. Notices are free; purchasing support is optional.",
+      "inLanguage": "en",
+      "dateModified": "2026-10-26",
+      "isPartOf": {
+        "@id": "https://evidect.veritaschain.org/#website"
+      },
+      "publisher": {
+        "@id": "https://evidect.veritaschain.org/#operator"
+      },
+      "primaryImageOfPage": {
+        "@id": "https://evidect.veritaschain.org/#socialimage"
+      },
+      "breadcrumb": {
+        "@id": "https://evidect.veritaschain.org/notices/#breadcrumb"
+      }
+    }
+  ]
+}
+</script>
+
 <link rel="stylesheet" href="/evidect.css?v=20261021">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"EVIDECT | Security risks, grounded in evidence","description":"EVIDECT shares security information grounded in public sources and external observations. Read the urgent PHP advisory and guidance for notice recipients. Operated by VeritasChain Co., Ltd.","inLanguage":"en","url":"https://evidect.veritaschain.org/notices/","dateModified":"2026-10-21","about":{"@type":"Organization","name":"EVIDECT","email":"info@veritaschain.org","parentOrganization":{"@type":"Organization","name":"VeritasChain Co., Ltd."}}}</script>
-<link rel="icon" type="image/svg+xml" href="/assets/img/evidect-mark.svg"><link rel="stylesheet" href="/assets/css/evidect-site.css?v=20261026"><script src="/assets/js/evidect-site.js?v=20261024" defer></script></head><body>
+<link rel="stylesheet" href="/assets/css/evidect-site.css?v=20261026"><script src="/assets/js/evidect-site.js?v=20261024" defer></script><link rel="stylesheet" href="/assets/css/seo-navigation.css?v=20261026">
+</head><body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="ev-header"><div class="ev-bar"><a class="ev-brand" href="/" aria-label="EVIDECT home"><svg viewBox="0 0 36 40" fill="none" aria-hidden="true"><path d="M6 3h24v34H6zM12 21l6 6L29 11" stroke="currentColor" stroke-width="2.5"/></svg><span>EVIDECT<small>EVIDENCE · SECURITY · ACTION</small></span></a><button class="ev-menu" type="button" aria-expanded="false" aria-controls="ev-nav">Menu ☰</button><nav class="ev-nav" id="ev-nav" aria-label="Main navigation"><a href="/certification/">Certification concept (Japanese)</a><a href="/services/">Services</a><a href="/methodology/">Approach</a><a href="/notices/" aria-current="page">Notices</a><a href="/about/">About</a><a href="/contact/" class="ev-contact">Contact</a></nav></div></header><div class="wrap" style="padding-block:16px;text-align:right"><a href="/notices/ja/" lang="ja">日本語</a> / <a href="/notices/" lang="en">English</a></div>
 <div class="top-notice"><div class="wrap"><span>Security fixes are available for two critical vulnerabilities in PHP.</span><a href="#php-advisory">Review the advisory →</a></div></div>
 <main id="main" tabindex="-1">
+<nav class="ev-breadcrumb" aria-label="Breadcrumb"><ol><li><a href="/">EVIDECT</a></li><li aria-current="page">Security notices</li></ol></nav>
 <div class="hero"><div class="wrap hero-grid"><div><p class="eyebrow">SECURITY RESEARCH &amp; NOTICES</p><h1>Observed facts.<br><span>Actionable next steps.</span></h1><p class="lead">EVIDECT is an initiative that helps organizations understand security concerns through public information and external observations. We distinguish what has been confirmed from what still needs checking.</p><div class="actions"><a class="btn primary" href="#recipients">Received a notice?<span aria-hidden="true">↗</span></a><a class="btn secondary" href="#php-advisory">Read the PHP advisory<span aria-hidden="true">↓</span></a></div><p class="hero-note">Operated by VeritasChain Co., Ltd. · Free security information</p></div><div class="evidence"><div class="evidence-head"><span>EVIDENCE → ACTION</span><span class="signal">TRACEABLE SOURCES</span></div><div class="record"><span class="num">01</span><div><h3>Establish the facts</h3><p>Review published technical information and observations.</p></div></div><div class="record"><span class="num">02</span><div><h3>Assess the uncertainty</h3><p>Separate confirmed facts, possibilities and unknowns.</p></div></div><div class="record"><span class="num">03</span><div><h3>Explain the next steps</h3><p>Share sources and practical checks with the responsible team.</p></div></div><p class="evidence-foot">A product fingerprint alone does not establish a vulnerability or a compromise.</p></div></div></div>
 <section id="php-advisory" class="alert" aria-labelledby="alert-heading"><div class="wrap"><div class="section-head"><div><p class="eyebrow">SECURITY ADVISORY</p><h2 id="alert-heading">For organizations using PHP</h2></div><p>An urgent request to check your environment and act on the official PHP advisory.</p></div><article class="alert-card"><div class="alert-top"><div><span class="alert-tag">URGENT SECURITY INFORMATION · FIXES AVAILABLE</span><h3>Two critical vulnerabilities in PHP</h3></div><time datetime="2026-10-21">Information checked: 21 October 2026</time></div><div class="alert-body"><p>The PHP project has published fixes for two critical vulnerabilities that can allow unauthenticated remote code execution. If PHP handles web requests in your environment, contact your server administrator, maintenance partner or hosting provider and act promptly.</p><div class="alert-metrics"><div><span class="metric-label">Severity · CVSS v4.0</span><strong class="metric-value">9.2<span style="font-size:14px;color:var(--muted)"> / 10</span></strong></div><div><span class="metric-label">Vulnerabilities</span><strong class="metric-value">2</strong></div><div><span class="metric-label">Identifiers</span><strong class="metric-value small">CVE-2026-109618<br>CVE-2026-109619</strong></div></div><div class="alert-columns"><div><h4>Fixed PHP releases</h4><table class="versions"><caption>Use the fixed release for your branch, or a later release containing the fixes</caption><thead><tr><th scope="col">PHP branch</th><th scope="col">Fixed release</th></tr></thead><tbody><tr><td>PHP 8.5</td><td>8.5.12</td></tr><tr><td>PHP 8.4</td><td>8.4.27</td></tr><tr><td>PHP 8.3</td><td>8.3.36</td></tr><tr><td>PHP 8.2</td><td>8.2.35</td></tr></tbody></table><p class="note">Your operating system or hosting provider may supply packages with backported fixes. A displayed version number alone does not establish patch status; check the provider's advisory.</p><p class="note">For PHP 8.1 and earlier, check your vendor's fix availability or migrate to a supported branch.</p></div><div><h4>What to do now</h4><ol class="steps"><li>Identify PHP use across public websites, ecommerce and member services, including the running versions and configurations.</li><li>Apply a fixed release or the provider's patched package, then perform the required restarts and verify the running system.</li><li>If you cannot update promptly, discuss restricting exposure or temporarily taking the affected service offline. Do not treat temporary measures as a complete fix.</li></ol><p class="important">Updating WordPress or its plugins is separate from addressing the PHP runtime on your server.</p></div></div><p class="note">This is a general security advisory. It does not mean EVIDECT has confirmed a vulnerability, compromise or missing patch at any particular organization. Check the official sources below for updates before taking action.</p><ul class="sources"><li><a href="https://www.php.net/archive/2026.php" target="_blank" rel="noopener noreferrer">Official PHP announcement ↗</a></li><li><a href="https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w" target="_blank" rel="noopener noreferrer">Official PHP advisory ① ↗</a></li><li><a href="https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp" target="_blank" rel="noopener noreferrer">Official PHP advisory ② ↗</a></li></ul></div></article></div></section>
 <section id="recipients" aria-labelledby="reader-heading"><div class="wrap"><div class="section-head"><div><p class="eyebrow">FOR RECIPIENTS</p><h2 id="reader-heading">Received a notice from EVIDECT?</h2></div><p>Share it with your IT or security team, or the partner responsible for maintaining your website.</p></div><div class="cards"><article class="card"><span class="index">01</span><h3>Understand the purpose</h3><p>We share significant security information and relevant checks free of charge. Receiving a notice does not create a contract or a payment obligation.</p></article><article class="card"><span class="index">02</span><h3>Compare sources with your environment</h3><p>Review the cited sources and any identified URLs. Your administrator should confirm the actual configuration, version and patch status.</p></article><article class="card"><span class="index">03</span><h3>Verify the contact</h3><p>Our contact address for these notices is info@veritaschain.org. If you have questions, use the contact information on this page.</p></article></div><p class="reader-note">WordPress fingerprints or displayed versions do not prove the running PHP version, exposure to these vulnerabilities or compromise. Observations may reflect older information or statically generated pages.</p></div></section>
