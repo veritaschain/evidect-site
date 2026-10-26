@@ -117,11 +117,15 @@ class SiteTests(unittest.TestCase):
     def test_withdrawn_commercial_claim_is_not_restated(self):
         # VSO withdrew the paid-service contract figure on 2026-10-24
         # (vap-spec disclosures/2026-10-24-commercial-contracts.md).
-        withdrawn = re.compile(r'10件の有償|十件の有償|ten paid|10 paid', re.I)
-        for file in ROOT.rglob('*.html'):
-            if '.git' in file.parts:
-                continue
-            self.assertIsNone(withdrawn.search(file.read_text()), file)
+        withdrawn = re.compile(
+            r'(10|１０|十)\s*件の(有償|サービス)'
+            r'|\b(ten|10)\s+(paid\s+)?(service\s+)?contracts?\b',
+            re.I)
+        for pattern in ('*.html', '*.js', '*.json', '*.txt', '*.xml'):
+            for file in ROOT.rglob(pattern):
+                if '.git' in file.parts or 'tests' in file.parts:
+                    continue
+                self.assertIsNone(withdrawn.search(file.read_text()), file)
 
 
 if __name__ == '__main__':
