@@ -1,0 +1,12 @@
+/* Static, crawlable navigation; independent of JavaScript. */
+.ev-breadcrumb{box-sizing:border-box;max-width:1180px;margin:0 auto;padding:20px 30px 0;font:13px/1.7 system-ui,sans-serif;color:#b8c9d4}
+.ev-page .ev-breadcrumb{padding-left:0;padding-right:0}
+.ev-breadcrumb ol{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.ev-breadcrumb li{display:flex;gap:8px;align-items:baseline}
+.ev-breadcrumb li+li::before{content:"/";color:#91a4b2}
+.ev-breadcrumb a{color:#83e7c8;text-underline-offset:4px}
+.ev-topic-links{margin:25px 0 0;padding:20px 24px;border:1px solid #37514e;border-radius:8px;background:#10251f;color:#dcece8;font-size:15px;line-height:1.9}
+.ev-topic-links p{margin:0 0 10px}
+.ev-topic-links a{color:#a3f6dd;text-decoration:underline;text-underline-offset:4px}
+.ev-topic-links ul{display:flex;flex-wrap:wrap;gap:10px 26px;list-style:none;margin:0;padding:0}
+@media(max-width:600px){.ev-breadcrumb{padding:16px 20px 0;font-size:12px}.ev-topic-links{padding:18px}.ev-topic-links ul{display:block}.ev-topic-links li+li{margin-top:10px}}

@@ -32,3 +32,7 @@ The research service remains in development and its VAP/OAP/DAP integration rema
 The prices on `/support/` were provided and approved by the owner on 2026-10-22: free initial assessment; PHP/WordPress update JPY 11,000; update-related error support JPY 22,000/hour with the update fee included in a JPY 110,000 total cap; recovery JPY 11,000–110,000; monthly maintenance from JPY 11,000. All prices include tax. Scope, timing, and time calculation are confirmed before paid work.
 
 The form uses the existing native POST endpoint `https://formspree.io/f/xblvzzoo`, retaining Formspree verification and a honeypot. Each service link selects the corresponding inquiry category. The fallback email is `security@veritaschain.org`. No mail credentials, admin login, or uploads are requested. Test submissions must be intercepted locally; production delivery and domain allowlist checks remain separate from browser QA.
+
+## Search metadata
+
+Search titles, descriptions, structured data, icons, social previews and language alternates are maintained in `seo.json` and `scripts/update_seo.py`. See [SEO configuration and Google Trends rationale](docs/seo.md) for the observed queries, update procedure, validation and indexing follow-up.

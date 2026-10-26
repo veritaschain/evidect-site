@@ -1,0 +1,74 @@
+{
+  "/": {
+    "title": "EVIDECT｜セキュリティ認証の構想・AI調査の証拠設計",
+    "description": "EVIDECTは、実装・変更管理・脆弱性対応を証拠から継続評価するセキュリティ認証の構想を紹介。AIセキュリティ調査の監査証跡を解説し、PHP・WordPressの更新・復旧・保守のご相談も受け付けています。運営：VeritasChain株式会社。",
+    "label": "EVIDECT",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  },
+  "/certification/": {
+    "title": "継続型セキュリティ認証とは｜評価基準の構想 | EVIDECT",
+    "description": "実装の安全性、変更管理の体制と運用実績、新たな脆弱性への対応を継続評価するEVIDECTの認証構想。対象範囲・証拠・確認状態の示し方を解説します。制度と比較サイトは設計段階で、認証発行は未開始です。",
+    "label": "セキュリティ認証の構想",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  },
+  "/services/": {
+    "title": "PHP・WordPress対応とセキュリティのご相談 | EVIDECT",
+    "description": "PHP・WordPressの更新・復旧・保守、セキュリティ通知の確認、AI調査の証拠設計の相談窓口をご案内。受付中の対応と、開発・設計段階の研究や認証構想を区別して紹介します。",
+    "label": "サービス・ご相談内容",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  },
+  "/support/": {
+    "title": "PHP・WordPress更新・復旧・保守の料金 | EVIDECT",
+    "description": "PHPの脆弱性対応やWordPress更新をご相談ください。現状確認は無料、更新11,000円、更新後のエラー対応は22,000円／時間・更新費込み最大110,000円。復旧・月額保守にも対応。すべて税込、着手前に範囲・料金・日程を確認します。",
+    "label": "PHP・WordPress対応／料金",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  },
+  "/methodology/": {
+    "title": "AIセキュリティ調査の監査証跡・証拠設計 | EVIDECT",
+    "description": "AIによるセキュリティ調査で、許可・対象範囲・観測・判断をどう記録するか。VAP・OAP・DAPを参照し、脆弱性の候補と未確認条件、変更管理の証拠、記録から検証できることと限界を解説します。",
+    "label": "調査と証拠設計",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  },
+  "/notices/ja/": {
+    "title": "PHPの脆弱性情報・セキュリティ通知の確認 | EVIDECT",
+    "description": "EVIDECTからセキュリティ通知を受け取った方へ。PHPの脆弱性に関する公式情報と修正版の確認先、通知の根拠・確認範囲・お問い合わせ方法をご案内します。通知は無償の情報提供で、有償サービスの購入は不要です。",
+    "label": "セキュリティ通知",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  },
+  "/notices/": {
+    "title": "PHP Vulnerability Advisory & Security Notices | EVIDECT",
+    "description": "Received an EVIDECT security notice? Find official PHP vulnerability and release information, understand the evidence and its limits, and contact us. Notices are free; purchasing support is optional.",
+    "label": "Security notices",
+    "lang": "en",
+    "modified": "2026-10-26"
+  },
+  "/about/": {
+    "title": "EVIDECTについて｜運営会社 VeritasChain株式会社",
+    "description": "セキュリティ上の観測と根拠を次の対策につなげるEVIDECTの運営情報。VeritasChain株式会社の所在地・連絡先、取り組みの目的、VSO・VAPとの関係と、サービス・認証構想の現在の状態をご案内します。",
+    "label": "運営情報",
+    "lang": "ja",
+    "modified": "2026-10-26",
+    "type": "AboutPage"
+  },
+  "/contact/": {
+    "title": "お問い合わせ｜通知確認・AI調査の証拠設計 | EVIDECT",
+    "description": "EVIDECTのセキュリティ通知の確認、AI調査の証拠設計、研究協力についてのお問い合わせ窓口。PHP・WordPressの更新・復旧・保守は専用の相談フォームからお問い合わせいただけます。",
+    "label": "お問い合わせ",
+    "lang": "ja",
+    "modified": "2026-10-26",
+    "type": "ContactPage"
+  },
+  "/privacy/": {
+    "title": "プライバシーポリシー・お問い合わせ情報の取り扱い | EVIDECT",
+    "description": "EVIDECTにおけるお問い合わせ情報・アクセス情報の利用目的、外部サービス、情報の提供・保存、確認・訂正・削除の相談方法をご案内します。運営・情報の管理主体はVeritasChain株式会社です。",
+    "label": "プライバシーポリシー",
+    "lang": "ja",
+    "modified": "2026-10-26"
+  }
+}
