@@ -108,12 +108,11 @@
       "genre": "設計提案（参考情報・非規範）",
       "keywords": "AI security research, AI agent audit trail, vulnerability assessment, evidence provenance, VAP, OAP, DAP",
       "datePublished": "2026-10-21",
-      "dateModified": "2026-10-24",
+      "dateModified": "2026-10-26",
       "author": {
         "@type": "Organization",
-        "@id": "https://veritaschain.org/#organization",
-        "name": "VeritasChain Standards Organization (VSO)",
-        "url": "https://veritaschain.org/"
+        "name": "EVIDECT（VeritasChain株式会社）",
+        "url": "https://evidect.veritaschain.org/about/"
       },
       "publisher": {
         "@id": "https://evidect.veritaschain.org/#operator"
@@ -147,7 +146,7 @@
         "@type": "CreativeWork",
         "name": "Verifiable AI Provenance Framework (VAP) Specification",
         "version": "1.2.0 (Draft 3)",
-        "url": "https://github.com/veritaschain/vap-spec/blob/47bbeb59e1b3f0163882d473fc6542b07317641f/spec/v1.2/VAP_Framework_Specification.md"
+        "url": "https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/spec/v1.2/VAP_Framework_Specification.md"
       },
       "hasPart": [
         {
@@ -160,7 +159,11 @@
       "citation": [
         "https://www.nist.gov/news-events/news/2026/09/comments-software-and-agentic-ai-identity-concept-paper",
         "https://www.cyber.gov.au/advisory/agentic-ai-harnesses",
-        "https://www.cyber.gov.au/publication/careful-adoption-of-agentic-ai-services"
+        "https://www.cyber.gov.au/publication/careful-adoption-of-agentic-ai-services",
+        "https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/research-distribution/2026-10-24/README.md",
+        "https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/proposals/three-valued-verification/README.md",
+        "https://github.com/veritaschain/vcp-sdk/blob/026d11af43ba161a8b3bf9f7a8ef3328c3802e9e/README.md",
+        "https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/disclosures/2026-10-24-commercial-contracts.md"
       ]
     },
     {
@@ -200,7 +203,7 @@
           "name": "OAPとDAPは何ですか？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "どちらもVAP v1.2.0 Draft 3に登録されたWorking Draftです。OAP（Observed Artifact Provenance）は、第三者が公開したWeb上の資料をURLで観測した記録の来歴を扱う領域プロファイルです。DAP（Delegated Access Provenance、通称VAP-AGENT）は、委任された権限の下での、エージェントのアクセス、ツール呼出し、操作、データ移転の来歴を扱う分野横断のケイパビリティです。"
+            "text": "どちらもVAP v1.2.0 Draft 3に登録されたWorking Draftです。OAP（Observed Artifact Provenance）は、第三者が公開したWeb上の資料をURLで観測した記録の来歴を扱う領域プロファイルです。DAP（Delegated Access Provenance、通称VAP-AGENT）は、委任された権限の下での、エージェントのアクセス、ツール呼出し、操作、データ移転の来歴を扱う分野横断のケイパビリティです。登録簿上の状態と本文の公開は別で、2026年10月26日の確認時点では両文書の本文は未公開です。"
           }
         },
         {
@@ -420,8 +423,8 @@
 
         <nav class="sr-page-nav" aria-label="AI調査の技術解説の内容">
             <div class="sr-wrap">
-                <p class="sr-byline">技術解説の発行：<a href="https://veritaschain.org/vso/ja/">VeritasChain Standards Organization（VSO）</a> · 更新：<time datetime="2026-10-24">2026年10月24日</time></p>
-                <ul><li><a href="#concept">継続型認証の構想</a></li><li><a href="#security-context">最近のセキュリティ動向</a></li><li><a href="#design">証拠の設計</a></li><li><a href="#flow">調査フロー</a></li><li><a href="#limits">検証の限界</a></li><li><a href="#faq">よくある質問</a></li><li><a href="/contact/">お問い合わせ</a></li><li><a href="/notices/ja/">通知を受け取った方へ</a></li><li><a href="/support/">PHP・WordPress対応／料金</a></li></ul>
+                <p class="sr-byline">技術解説の発行：<a href="/about/">EVIDECT（VeritasChain株式会社）</a> · 更新：<time datetime="2026-10-26">2026年10月26日</time></p>
+                <ul><li><a href="#concept">継続型認証の構想</a></li><li><a href="#security-context">最近のセキュリティ動向</a></li><li><a href="#design">証拠の設計</a></li><li><a href="#flow">調査フロー</a></li><li><a href="#limits">検証の限界</a></li><li><a href="#faq">よくある質問</a></li><li><a href="#specs">仕様・開発の公開状況</a></li><li><a href="/contact/">お問い合わせ</a></li><li><a href="/notices/ja/">通知を受け取った方へ</a></li><li><a href="/support/">PHP・WordPress対応／料金</a></li></ul>
             </div>
         </nav>
 
@@ -474,7 +477,7 @@
                     </div>
                     <div>
                         <dt>仕様の状態確認日</dt>
-                        <dd><time datetime="2026-10-20">2026年10月20日</time></dd>
+                        <dd><time datetime="2026-10-26">2026年10月26日</time></dd>
                     </div>
                 </dl>
             </div>
@@ -624,7 +627,7 @@
                     <li><span class="sr-tag sr-tag--spec"><i class="fas fa-book" aria-hidden="true"></i>仕様の記述</span><br>1つの導入は、領域プロファイルを1つだけ使い、分野横断のケイパビリティを0個以上組み合わせられます。使うケイパビリティは宣言が必要で、同じ種類のイベントに両方の制約がかかる場合は、厳しい方が適用されます（VAP v1.2 §4.6.3）。</li>
                     <li><span class="sr-tag sr-tag--spec"><i class="fas fa-book" aria-hidden="true"></i>仕様の記述</span><br>OAPは、取得を自律エージェントが行う場合にDAPと組み合わせる、と記載されています（VAP v1.2 §4.6.4・§5.4）。</li>
                     <li><span class="sr-tag sr-tag--spec"><i class="fas fa-book" aria-hidden="true"></i>仕様の記述</span><br>Working Draftは、イベント名・フィールド名・不変条件の表現が今後変わりうる段階であり、本番環境での適合の主張には使えません（VAP v1.2 §4.5.2）。</li>
-                    <li class="sr-facts-note"><span class="sr-tag sr-tag--note"><i class="fas fa-magnifying-glass" aria-hidden="true"></i>確認の範囲</span><br>OAPとDAPの本文は、本ページ作成時点（2026年10月20日）で、VSOの公開リポジトリには掲載されていません。本ページの説明は、VAP v1.2本文の記述にもとづきます。</li>
+                    <li class="sr-facts-note"><span class="sr-tag sr-tag--note"><i class="fas fa-magnifying-glass" aria-hidden="true"></i>確認の範囲</span><br>OAPとDAPの本文は、今回の確認時点（2026年10月26日）で、VSOの公開リポジトリには掲載されていません。本ページの説明は、VAP v1.2本文の記述にもとづきます。</li>
                 </ul>
 
                 <div class="sr-proposal" aria-labelledby="proposal-title">
@@ -989,7 +992,7 @@
                     </article>
                     <article class="sr-faq-item">
                         <h3><i class="fas fa-circle-question" aria-hidden="true"></i>OAPとDAPは何ですか？</h3>
-                        <p>どちらもVAP v1.2.0 Draft 3に登録されたWorking Draftです。OAP（Observed Artifact Provenance）は、第三者が公開したWeb上の資料をURLで観測した記録の来歴を扱う領域プロファイルです。DAP（Delegated Access Provenance、通称VAP-AGENT）は、委任された権限の下での、エージェントのアクセス、ツール呼出し、操作、データ移転の来歴を扱う分野横断のケイパビリティです。</p>
+                        <p>どちらもVAP v1.2.0 Draft 3に登録されたWorking Draftです。OAP（Observed Artifact Provenance）は、第三者が公開したWeb上の資料をURLで観測した記録の来歴を扱う領域プロファイルです。DAP（Delegated Access Provenance、通称VAP-AGENT）は、委任された権限の下での、エージェントのアクセス、ツール呼出し、操作、データ移転の来歴を扱う分野横断のケイパビリティです。登録簿上の状態と本文の公開は別で、2026年10月26日の確認時点では両文書の本文は未公開です。</p>
                     </article>
                     <article class="sr-faq-item">
                         <h3><i class="fas fa-circle-question" aria-hidden="true"></i>社内でAIに作業を任せれば、対象企業のシステムを調べてもよいのですか？</h3>
@@ -1016,27 +1019,42 @@
             <div class="sr-wrap">
                 <span class="sr-kicker"><i class="fas fa-book" aria-hidden="true"></i>08 · 参照仕様・公開状況・レビュー</span>
                 <h2 id="specs-title">仕様を確認し、設計をレビューする。</h2>
-                <p class="sr-lead">本ページが参照した資料と、関連する成果物の公開状況です。状態は文字で示しています。</p>
+                <p class="sr-lead">2026年10月26日にVeritaschainの公開GitHubと照合した資料です。仕様、研究用の成果物、EVIDECT自身の実装状況を分けて示します。</p>
                 <ul class="sr-refs">
                     <li>
-                        <span class="sr-ref-title"><i class="fas fa-file-lines" aria-hidden="true"></i><a href="https://github.com/veritaschain/vap-spec/blob/47bbeb59e1b3f0163882d473fc6542b07317641f/spec/v1.2/VAP_Framework_Specification.md">VAP Framework Specification v1.2.0（Draft 3）</a></span>
+                        <span class="sr-ref-title"><i class="fas fa-file-lines" aria-hidden="true"></i><a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/spec/v1.2/VAP_Framework_Specification.md">VAP Framework Specification v1.2.0（Draft 3）</a></span>
                         <span class="sr-state sr-state--published">公開済み（Draft Specification）</span>
-                        <span class="sr-ref-meta">VSO-VAP-SPEC-001 · <a href="https://github.com/veritaschain/vap-spec">veritaschain/vap-spec</a>（2026年10月20日に確認したコミット <span class="sr-mono">47bbeb5</span>）</span>
+                        <span class="sr-ref-meta">VSO-VAP-SPEC-001 · <a href="https://github.com/veritaschain/vap-spec">veritaschain/vap-spec</a>（2026年10月26日に確認したコミット <span class="sr-mono">81fa81e</span>）</span>
                     </li>
                     <li>
-                        <span class="sr-ref-title"><i class="fas fa-file-lines" aria-hidden="true"></i><a href="https://github.com/veritaschain/vap-spec/blob/47bbeb59e1b3f0163882d473fc6542b07317641f/spec/v1.2/VSO-VAP-CHANGE-001.md">VAP v1.2 変更提案（規範的附属書）</a></span>
+                        <span class="sr-ref-title"><i class="fas fa-file-lines" aria-hidden="true"></i><a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/spec/v1.2/VSO-VAP-CHANGE-001.md">VAP v1.2 変更提案（規範的附属書）</a></span>
                         <span class="sr-state sr-state--published">公開済み</span>
-                        <span class="sr-ref-meta">VSO-VAP-CHANGE-001 · VAP v1.2の変更管理を定める文書</span>
+                        <span class="sr-ref-meta">VSO-VAP-CHANGE-001 · VAP v1.2の変更管理を定める文書。現在の互換性・適合状況は、訂正を含むVAP本文§10.4を参照してください。</span>
                     </li>
                     <li>
                         <span class="sr-ref-title"><i class="fas fa-file-pen" aria-hidden="true"></i>OAP — <span lang="en">Observed Artifact Provenance</span> v0.1.1</span>
-                        <span class="sr-state sr-state--draft">Working Draft</span>
-                        <span class="sr-ref-meta">VSO-VAP-OAP-001 · VAP v1.2 §4.5.2 のプロファイル登録簿に記載。本文はVSOの公開リポジトリに未掲載（2026年10月20日確認）</span>
+                        <span class="sr-state sr-state--draft">登録簿上はWorking Draft・本文未公開</span>
+                        <span class="sr-ref-meta">VSO-VAP-OAP-001 · VAP v1.2 §4.5.2 のプロファイル登録簿に記載。本文はVSOの公開リポジトリに未掲載（2026年10月26日確認）</span>
                     </li>
                     <li>
                         <span class="sr-ref-title"><i class="fas fa-file-pen" aria-hidden="true"></i>DAP — <span lang="en">Delegated Access Provenance</span>（<span lang="en">VAP-AGENT</span>）v0.1.0</span>
-                        <span class="sr-state sr-state--draft">Working Draft</span>
-                        <span class="sr-ref-meta">VSO-VAP-DAP-001 · VAP v1.2 §4.6.2 のケイパビリティ登録簿に記載。本文はVSOの公開リポジトリに未掲載（2026年10月20日確認）</span>
+                        <span class="sr-state sr-state--draft">登録簿上はWorking Draft・本文未公開</span>
+                        <span class="sr-ref-meta">VSO-VAP-DAP-001 · VAP v1.2 §4.6.2 のケイパビリティ登録簿に記載。本文はVSOの公開リポジトリに未掲載（2026年10月26日確認）</span>
+                    </li>
+                    <li>
+                        <span class="sr-ref-title"><i class="fas fa-flask" aria-hidden="true"></i><a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/research-distribution/2026-10-24/README.md">VAP研究用の固定版再現キット</a></span>
+                        <span class="sr-state sr-state--draft">公開済み・実験段階／未採択</span>
+                        <span class="sr-ref-meta">2026年10月24日版。検証器、実行前ゲート、OS隔離実験の固定ソースと内部実行記録を公開。第三者による独立再現は未成立で、EVIDECTの実装・適合試験結果ではありません。</span>
+                    </li>
+                    <li>
+                        <span class="sr-ref-title"><i class="fas fa-file-pen" aria-hidden="true"></i><a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/proposals/three-valued-verification/README.md">検証結果を3値で扱う議論用草案</a></span>
+                        <span class="sr-state sr-state--draft">改訂0.2・未採択</span>
+                        <span class="sr-ref-meta">2026年10月25日改訂。検証成功・不一致・判定不能を区別し、証拠不足によって既知の不一致を隠さない集約を提案しています。現在のVAPの規範要件を変更するものではありません。</span>
+                    </li>
+                    <li>
+                        <span class="sr-ref-title"><i class="fas fa-code" aria-hidden="true"></i><a href="https://github.com/veritaschain/vcp-sdk/blob/026d11af43ba161a8b3bf9f7a8ef3328c3802e9e/README.md">VCP SDK 0.1.0</a></span>
+                        <span class="sr-state sr-state--draft">プレリリース・自社実装</span>
+                        <span class="sr-ref-meta">VCP v1.2向けのオフライン処理をPython・TypeScript・MQL5で公開。ハッシュ、Merkle木、署名、検証を扱います。適合認証済みではなく、外部実装やEVIDECTへの組み込み完了を示すものではありません。</span>
                     </li>
                     <li>
                         <span class="sr-ref-title"><i class="fas fa-table-columns" aria-hidden="true"></i><a href="#mapping">適用対応表（仕様上の記述と本ページの提案）</a></span>
@@ -1056,7 +1074,7 @@
                     <li>
                         <span class="sr-ref-title"><i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>EVIDECTでの証跡統合</span>
                         <span class="sr-state sr-state--none">設計段階</span>
-                        <span class="sr-ref-meta">VAP・OAP・DAPによる証跡統合は設計段階です。公開されたコード、証拠一式、適合試験の結果はありません。</span>
+                        <span class="sr-ref-meta">EVIDECT自身のVAP・OAP・DAPによる証跡統合は設計段階です。この統合のコード、証拠一式、適合試験の結果は未公開です。上記の研究用キットや金融分野のSDKとは区別します。</span>
                     </li>
                 </ul>
 
@@ -1080,6 +1098,7 @@
 
                 <h3 class="sr-subhead"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i>変更履歴</h3>
                 <ol class="sr-history" reversed>
+                    <li><time datetime="2026-10-26">2026-10-26</time><span>公開GitHubと照合し、契約件数の撤回、発行主体、VAP参照版、OAP・DAPの本文公開状況を更新。研究用再現キット、3値検証の議論用草案、VCP SDKの公開状況を追加。</span></li>
                     <li><time datetime="2026-10-24">2026-10-24</time> EVIDECT独自のナビゲーションと、サービス・証拠設計・運営情報・お問い合わせ・プライバシーの各ページを追加。</li>
                         <li><time datetime="2026-10-22">2026-10-22</time><span>EVIDECTの日本語トップページとして掲載。既存のセキュリティ通知の案内は<a href="/notices/ja/">専用ページ</a>に掲載。</span></li>
                     <li><time datetime="2026-10-21">2026-10-21</time><span>最近の公的セキュリティ指針、目次、監査証跡に関するFAQ、お問い合わせフォームを追加。検索・共有向けの情報を更新。</span></li>
@@ -1100,9 +1119,11 @@
                 <h2 id="disclosure-title">組織と実装状況の開示</h2>
                 <dl class="sr-kv">
                     <dt>VSOとVeritasChain株式会社</dt>
-                    <dd>VSOの運営基盤は、VeritasChain株式会社が提供しています。VSOの中立性は法人形態ではなく、公開された仕組みによって担保しています（<a href="https://veritaschain.org/vso/policies/ja/">VSOの中立性と運営基盤に関する方針</a>）。</dd>
-                    <dt>実装状況（VAP v1.2の記載に基づく開示）</dt>
-                    <dd>VAPおよびVAPのプロファイルの外部実装はゼロ、いかなる手続においても受理されたEvidence Packもゼロです。VSOの運営基盤であるVeritasChain株式会社は、規制技術、金融取引、監査・保証の分野の欧州の組織と10件の有償サービス契約を締結しています（顧客名は個別の同意が得られるまで非公開）。これらの契約は、VAPまたはVCPの外部実装ではなく、それらの仕様の独立した検証でもありません。</dd>
+                    <dd>VSOは仕様の策定・維持を行い、VeritasChain株式会社がその運営基盤を提供しています。EVIDECTも同社の取り組みであり、独立した外部組織による採用事例ではありません（<a href="https://veritaschain.org/vso/policies/ja/">VSOの運営方針</a>）。</dd>
+                    <dt>実装・商業上の開示（公表基準日：2026年10月25日／再確認：10月26日）</dt>
+                    <dd>VSOの公開資料では、VAPおよび各プロファイルの外部実装はゼロ、いかなる手続においても受理されたEvidence Packもゼロとされています。以前に公表した有償サービス契約の件数は、一次記録との照合が済むまで2026年10月24日に取り下げられています。これは件数がゼロだという意味ではありません。商業上の活動は、外部実装・独立した検証・Evidence Packの受理とは区別します（<a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/disclosures/2026-10-24-commercial-contracts.md">日付入りの訂正</a>・<a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/disclosures/2026-10-24-counting-criteria.md">集計基準案</a>・<a href="https://veritaschain.org/vso/corrections/ja/">訂正記録</a>）。</dd>
+                    <dt>VAPの審査機関と独立性</dt>
+                    <dd>VAPは、制度の運営主体から独立した適合性評価機関（CAB）による審査を要件としています。ただし、最新の公開仕様が記録する登録CABはVeritasChain株式会社のみで、同社はVSOの運営主体から独立していません。EVIDECTの認証構想を、VAPの独立認証を取得したサービスとして表示するものではありません（<a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/spec/v1.2/VAP_Framework_Specification.md#101-governance-structure">VAP §10.1・訂正E-2026-10-21</a>）。</dd>
                 </dl>
             </div>
         </section>
