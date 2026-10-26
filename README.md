@@ -2,7 +2,8 @@
 
 Independent static GitHub Pages site for `https://evidect.veritaschain.org/`.
 
-- `/`: Japanese AI security research and evidence-design article, adapted from `veritaschain/vcp-site`.
+- `/`: continuous security certification concept and three evaluation pillars, followed by the existing Japanese AI security research and evidence-design article.
+- `/certification/`: proposed assessment of current implementation, change-management roles and operational evidence, newly discovered risks, scope, and certification status.
 - `/services/`: overview of available support and research consultations.
 - `/methodology/`: investigation scope, observations and evidence-design approach.
 - `/support/`: PHP/WordPress support, owner-approved tax-inclusive prices and inquiry form.
@@ -22,9 +23,9 @@ GitHub Pages publishes `main` at `/`. Xserver DNS has `evidect CNAME veritaschai
 
 The old Japanese URL at `https://veritaschain.org/use-cases/security-research/ja/` uses an immediate HTML/JavaScript redirect that preserves query strings and fragments. This is not an HTTP 301 redirect. Parent-site links and sitemap were updated in `veritaschain/vcp-site#97`.
 
-`sitemap.xml` lists nine canonical pages. Submit `https://evidect.veritaschain.org/sitemap.xml` in Search Console and use URL inspection for priority pages. A sitemap or indexing request does not guarantee immediate indexing.
+`sitemap.xml` lists ten canonical pages. Submit `https://evidect.veritaschain.org/sitemap.xml` in Search Console and use URL inspection for priority pages. A sitemap or indexing request does not guarantee immediate indexing.
 
-The research service remains in development and its VAP/OAP/DAP integration remains at the design stage. Publishing this information site is not a claim of product availability or conformance.
+The research service remains in development and its VAP/OAP/DAP integration remains at the design stage. The continuous certification scheme and comparison directory are concepts under design; certification issuance and a live company directory have not started. The example status record is fictional and static. Hashes/VAP support record verification, not proof of service security. Publishing this information site is not a claim of product availability or conformance.
 
 ## Support inquiry page
 
