@@ -69,7 +69,7 @@ class SiteTests(unittest.TestCase):
                 self.assertEqual(json.loads(raw)['@context'], 'https://schema.org')
         tree = ET.parse(ROOT / 'sitemap.xml')
         locations = [n.text for n in tree.findall('.//{*}loc')]
-        self.assertEqual(len(locations), 9)
+        self.assertEqual(len(locations), 10)
         self.assertTrue(all(url.startswith('https://evidect.veritaschain.org/') for url in locations))
         self.assertNotIn('https://evidect.veritaschain.org/ja/', locations)
 

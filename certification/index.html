@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>継続型セキュリティ認証とは｜評価基準の構想 | EVIDECT</title>
+<meta name="description" content="実装の安全性、変更管理の体制と運用実績、新たな脆弱性への対応を継続評価するEVIDECTの認証構想。対象範囲・証拠・確認状態の示し方を解説します。制度と比較サイトは設計段階で、認証発行は未開始です。">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="author" content="VeritasChain株式会社">
+<link rel="canonical" href="https://evidect.veritaschain.org/certification/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EVIDECT">
+<meta property="og:title" content="継続型セキュリティ認証とは｜評価基準の構想 | EVIDECT">
+<meta property="og:description" content="実装の安全性、変更管理の体制と運用実績、新たな脆弱性への対応を継続評価するEVIDECTの認証構想。対象範囲・証拠・確認状態の示し方を解説します。制度と比較サイトは設計段階で、認証発行は未開始です。">
+<meta property="og:url" content="https://evidect.veritaschain.org/certification/">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://evidect.veritaschain.org/assets/img/evidect-social.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="EVIDECT — Evidence · Security · Action">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="継続型セキュリティ認証とは｜評価基準の構想 | EVIDECT">
+<meta name="twitter:description" content="実装の安全性、変更管理の体制と運用実績、新たな脆弱性への対応を継続評価するEVIDECTの認証構想。対象範囲・証拠・確認状態の示し方を解説します。制度と比較サイトは設計段階で、認証発行は未開始です。">
+<meta name="twitter:image" content="https://evidect.veritaschain.org/assets/img/evidect-social.png">
+<meta name="twitter:image:alt" content="EVIDECT — Evidence · Security · Action">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+<link rel="icon" type="image/svg+xml" sizes="any" href="/assets/img/evidect-mark.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0b1420">
+<script id="site-webpage" type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://evidect.veritaschain.org/#operator",
+      "name": "VeritasChain株式会社",
+      "legalName": "VeritasChain株式会社",
+      "alternateName": "VeritasChain Co., Ltd.",
+      "url": "https://evidect.veritaschain.org/about/",
+      "email": "info@veritaschain.org",
+      "duns": "698368529",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "JP",
+        "addressRegion": "東京都",
+        "addressLocality": "渋谷区",
+        "streetAddress": "恵比寿西2-4-8"
+      },
+      "brand": {
+        "@id": "https://evidect.veritaschain.org/#brand"
+      }
+    },
+    {
+      "@type": "Brand",
+      "@id": "https://evidect.veritaschain.org/#brand",
+      "name": "EVIDECT",
+      "url": "https://evidect.veritaschain.org/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://evidect.veritaschain.org/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://evidect.veritaschain.org/#website",
+      "url": "https://evidect.veritaschain.org/",
+      "name": "EVIDECT",
+      "inLanguage": [
+        "ja",
+        "en"
+      ],
+      "publisher": {
+        "@id": "https://evidect.veritaschain.org/#operator"
+      }
+    },
+    {
+      "@type": "ImageObject",
+      "@id": "https://evidect.veritaschain.org/#socialimage",
+      "url": "https://evidect.veritaschain.org/assets/img/evidect-social.png",
+      "contentUrl": "https://evidect.veritaschain.org/assets/img/evidect-social.png",
+      "width": 1200,
+      "height": 630,
+      "caption": "EVIDECT — Evidence · Security · Action"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://evidect.veritaschain.org/certification/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "EVIDECT",
+          "item": "https://evidect.veritaschain.org/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "セキュリティ認証の構想",
+          "item": "https://evidect.veritaschain.org/certification/"
+        }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://evidect.veritaschain.org/certification/#webpage",
+      "url": "https://evidect.veritaschain.org/certification/",
+      "name": "継続型セキュリティ認証とは｜評価基準の構想 | EVIDECT",
+      "description": "実装の安全性、変更管理の体制と運用実績、新たな脆弱性への対応を継続評価するEVIDECTの認証構想。対象範囲・証拠・確認状態の示し方を解説します。制度と比較サイトは設計段階で、認証発行は未開始です。",
+      "inLanguage": "ja",
+      "dateModified": "2026-10-26",
+      "isPartOf": {
+        "@id": "https://evidect.veritaschain.org/#website"
+      },
+      "publisher": {
+        "@id": "https://evidect.veritaschain.org/#operator"
+      },
+      "primaryImageOfPage": {
+        "@id": "https://evidect.veritaschain.org/#socialimage"
+      },
+      "breadcrumb": {
+        "@id": "https://evidect.veritaschain.org/certification/#breadcrumb"
+      }
+    }
+  ]
+}
+</script>
+
+<link rel="stylesheet" href="/assets/css/evidect-site.css?v=20261026">
+  <link rel="stylesheet" href="/assets/css/certification.css?v=20261026">
+  <script src="/assets/js/evidect-site.js?v=20261024" defer></script>
+<link rel="stylesheet" href="/assets/css/seo-navigation.css?v=20261026">
+</head>
+<body class="ev-page ev-cert-page">
+  <a class="ev-skip" href="#main">本文へ移動</a>
+  <header class="ev-header"><div class="ev-bar"><a class="ev-brand" href="/" aria-label="EVIDECT ホーム"><svg viewBox="0 0 36 40" fill="none" aria-hidden="true"><path d="M6 3h24v34H6zM12 21l6 6L29 11" stroke="currentColor" stroke-width="2.5"/></svg><span>EVIDECT<small>EVIDENCE · SECURITY · ACTION</small></span></a><button class="ev-menu" type="button" aria-expanded="false" aria-controls="ev-nav">メニュー ☰</button><nav class="ev-nav" id="ev-nav" aria-label="メインナビゲーション"><a href="/certification/" aria-current="page">認証構想</a><a href="/services/">サービス</a><a href="/methodology/">調査と証拠設計</a><a href="/notices/ja/">通知を受け取った方へ</a><a href="/about/">運営情報</a><a href="/contact/" class="ev-contact">お問い合わせ</a></nav></div></header>
+  <main id="main" tabindex="-1">
+<nav class="ev-breadcrumb" aria-label="パンくず"><ol><li><a href="/">EVIDECT</a></li><li aria-current="page">セキュリティ認証の構想</li></ol></nav>
+<div class="ev-intro">
+      <p class="ev-kicker">CONTINUOUS SECURITY ASSURANCE</p>
+      <h1>変わり続けるサービスを、<br>確かめ続ける。</h1>
+      <p class="ev-lead">今日、対策を確認できても、明日のコード修正や設定変更で状況は変わります。EVIDECTは、今の実装と、その状態を維持する体制・運用実績を、共通の基準と証拠から継続して評価する認証を目指しています。</p>
+      <span class="ev-status ev-status--design">認証制度・比較サイトは構想／設計段階</span>
+      <p class="ev-help">このページは評価方針の提案です。認証の発行や、認証企業の一覧公開を開始したものではありません。更新：<time datetime="2026-10-26">2026年10月26日</time></p>
+      <nav class="ev-cert-nav" aria-label="このページの内容"><a href="#implementation">今の実装</a><a href="#change-management">変更を支える体制と運用</a><a href="#new-risks">新たなリスクへの対応</a><a href="#status">認証状態</a><a href="#evidence">共通基準と証拠</a></nav>
+    </div>
+
+    <section class="ev-section" id="implementation" aria-labelledby="implementation-title">
+      <p class="ev-kicker">01 · 今の実装</p>
+      <h2 id="implementation-title">実際に、必要な対策が機能しているか。</h2>
+      <p>対象サービスの設定・アクセス権限・処理の動作を確認し、特に次の三つの領域を重視します。認可のルールと、実際の処理がそのルールを通ることの両方を、対象範囲に応じた検査で確かめる方針です。</p>
+      <ul class="ev-areas">
+        <li><strong>非公開情報の漏えい</strong>許可されていない人が、他人の個人情報や非公開のデータを読めないか。</li>
+        <li><strong>アカウント・権限の不正利用</strong>他人になりすましたり、与えられていない権限で操作できないか。</li>
+        <li><strong>金額・取引の改ざん</strong>金額や注文内容を不正に変えたり、決められた取引手順を飛ばせないか。</li>
+      </ul>
+      <p>プログラムの窓口であるAPIなどを洗い出し、実際に動いている構成と検査一覧を照合します。必要なテストがない箇所を把握し、不正な閲覧・操作・取引を想定したテストを行います。必要な確認が未完了の範囲は、適合済みと扱いません。</p>
+      <p class="ev-help">検査対象、前提条件、未確認の範囲を明示します。テストを実施したことだけで、すべての欠陥がないと結論付けるものではありません。</p>
+    </section>
+
+    <section class="ev-section" id="change-management" aria-labelledby="change-title">
+      <p class="ev-kicker">02 · 変更を支える体制と運用</p>
+      <h2 id="change-title">変更後も、基準を維持できるか。</h2>
+      <p><strong>誰が確認するかという体制と、その体制が実際に働いた記録を、合わせて確認します。</strong>コード、設定、利用するソフトウェアの更新を対象に、変更・検査・承認・サービスへの反映をたどれるようにする方針です。</p>
+      <ol class="ev-change-steps">
+        <li><strong>変更する権限と、確認する責任を定める。</strong><br>誰が変更・承認・緊急対応を行えるか。変更の重要度に応じた確認手順と、実際の権限設定を確認します。</li>
+        <li><strong>変更を公開する前に、必要な検査を通す。</strong><br>所定の検査に合格しない変更を止める仕組みと、検査結果・承認の記録を確認します。</li>
+        <li><strong>検査した内容が、利用者の使う環境に反映されたか照合する。</strong><br>利用者が使う環境（本番）の変更記録と、検査したコード・設定の版を突き合わせます。管理者による直接変更も確認対象に含めます。</li>
+        <li><strong>緊急時の例外も、再確認まで追跡する。</strong><br>通常の手順を省略した理由、責任者、再検査の期限と結果を確認します。不具合があれば、元に戻す・停止するなどの対応も記録します。</li>
+      </ol>
+      <p class="ev-note">たとえば、検査を通さない変更が本番に入ったことを検知した場合、影響範囲の認証を確認保留にし、再検証します。通常の変更は共通手順で確認し、重要な変更や例外は追加評価する設計です。</p>
+      <p class="ev-help">組織の人数だけで評価するものではありません。役割・権限・確認手順と運用実績を見ます。検査を通過しても未知の欠陥は残り得るため、「今後も脆弱性が一切入らない」という保証はしません。開発全体で対策を続ける考え方の参照資料：<a href="#ref-ssdf">NIST SSDF［1］</a>。</p>
+    </section>
+
+    <section class="ev-section" id="new-risks" aria-labelledby="risk-title">
+      <p class="ev-kicker">03 · 新たなリスクへの対応</p>
+      <h2 id="risk-title">新しい問題を知った後、対応できているか。</h2>
+      <p>利用するソフトウェアで新たな脆弱性が見つかった場合や、外部から報告が届いた場合に、対象サービスへの影響を確認し、修正と再検査まで追跡します。報告窓口、担当者、対応期限に加え、実際の対応状況を評価する方針です。</p>
+      <div class="ev-cols">
+        <article class="ev-panel"><h3>報告を受け止める</h3><p>脆弱性の報告窓口があり、受領・影響確認・担当者への引継ぎが行われているか。対応が必要な問題の期限と進捗を確認します。</p></article>
+        <article class="ev-panel"><h3>対応を数字で伝える</h3><p>初回の有効な報告受領・検知から、本番で修正を確認するまでの日数。関連する脆弱性の公表日からの日数も、起点を明示して示す設計です。</p></article>
+      </div>
+      <p class="ev-help">対応日数には、重要度、集計期間、対象件数、未解決の件数と経過日数を添えます。事例がない場合は「実績なし」とし、0日とは表示しません。暫定対策・リスク受容・影響なしの判断は、修正完了と区別します。</p>
+    </section>
+
+    <section class="ev-section" id="status" aria-labelledby="status-title">
+      <p class="ev-kicker">STATUS &amp; SCOPE</p>
+      <h2 id="status-title">確認できている状況を、認証状態に反映する。</h2>
+      <p>会社名から探せる一覧で、<strong>サービスごとの対象範囲、判定の根拠、最終確認日時、確認間隔</strong>を比較できる仕組みを目指します。会社全体の安全性を一つのマークで保証する設計にはしません。</p>
+      <dl class="ev-state-list">
+        <div><dt>有効</dt><dd>対象範囲で所定の基準への適合を確認し、必要な継続確認が行われている状態。</dd></div>
+        <div><dt>検証中</dt><dd>初回の評価が完了していない状態。認証取得済みとして扱いません。</dd></div>
+        <div><dt>確認保留</dt><dd>未検証の変更、証拠の期限超過、監視の停止などで、現在の適合を確認できない状態。</dd></div>
+        <div><dt>停止</dt><dd>認証条件への不適合を確認し、有効な認証としての扱いを停止した状態。</dd></div>
+        <div><dt>失効</dt><dd>有効期限の満了や、認証の終了により効力が失われた状態。</dd></div>
+      </dl>
+      <p>状態の理由と更新日時も表示し、必要な修正・再確認を経て状態を更新する方針です。保留・停止・復帰の条件や確認期限は、評価基準として事前に明示します。</p>
+      <p class="ev-note">確認保留は「危険が立証された」という意味ではありません。未参加の企業も「危険」と評価しません。変更の検知には遅れがあり得るため、最終確認日時と確認間隔を併せて伝えます。</p>
+      <div class="ev-example" aria-labelledby="example-title">
+        <p class="ev-example-label">一覧に載せる情報の設計例 · 架空のサービス</p>
+        <h3 id="example-title">サンプル社 ／ 対象サービスA</h3>
+        <p>認証状態の例：確認保留 — 未検証の設定変更を確認</p>
+        <dl>
+          <div><dt>対象範囲</dt><dd>会員情報・権限管理・注文処理。対象外の機能も記載。</dd></div>
+          <div><dt>判定の根拠</dt><dd>適用基準の版、確認した設定・テスト・運用記録の要約。</dd></div>
+          <div><dt>情報の新しさ</dt><dd>最終確認日時、状態の更新日時、確認間隔。</dd></div>
+          <div><dt>問題への対応</dt><dd>報告窓口、修正に要した日数、未解決件数と経過日数。</dd></div>
+        </dl>
+        <p class="ev-help">静的な表示例です。実在する企業の評価や、動作中の監視結果ではありません。機密を含む証拠の原本は、そのまま一般公開せず、第三者の検証と顧客への要約公開を分ける方針です。</p>
+      </div>
+    </section>
+
+    <section class="ev-section" id="evidence" aria-labelledby="evidence-title">
+      <p class="ev-kicker">SHARED CRITERIA · VERIFIABLE EVIDENCE</p>
+      <h2 id="evidence-title">同じ基準と証拠から、判断をたどれるように。</h2>
+      <p>基準、検査手順、証拠の形式を共通化し、機械で確認できる部分を自動化します。自動判定は、対象・証拠・基準と検査ツールの版・検査条件をそろえて再現できるようにし、人による評価が必要な部分も、判断理由と例外を記録する設計です。審査のばらつきと負担を抑え、第三者が再確認しやすくすることを目指します。</p>
+      <p>証拠の収集元、対象サービスとの対応、必要な範囲がそろっているか、いつの情報かも確認します。記録を保存するだけで適合と判定することはありません。機械で扱える評価情報については、<a href="#ref-oscal">NIST OSCAL［2］</a>などの先行する仕組みも参考にします。</p>
+      <h3>VAPは、証拠と判定の履歴を確認するために。</h3>
+      <p>VAPとの連携では、変更 → 検査 → 承認 → 本番反映 → 対応の記録を結び付け、後から改変されていないかを検証する仕組みを検討しています。ハッシュ値（データから計算する要約値）、署名、外部に固定した記録を組み合わせる設計です。<a href="#ref-hash">［3］</a> <a href="#ref-vap">［4］</a></p>
+      <p class="ev-note"><strong>ハッシュ計算やVAPそのものが、安全性を証明するわけではありません。</strong><br>記録が改変されていないことと、記録の内容が正しいこと、対策が適切なことは、それぞれ別に確認します。一度も収集されなかった操作の記録まで、ハッシュから復元・確認することはできません。</p>
+    </section>
+
+    <section class="ev-section" id="questions" aria-labelledby="questions-title">
+      <h2 id="questions-title">よくある質問</h2>
+      <details><summary>ISO 27001と、何が違いますか？</summary><p>ISO/IEC 27001は、情報セキュリティを管理し、維持・改善する仕組みの要求事項を定めています。組織のリスク管理と継続的な改善を支えるための規格です。<a href="#ref-iso">［5］</a></p><p>EVIDECTの構想は、対象サービスの実装と運用の証拠、共通手順による評価、更新される確認状態を、顧客が比較できるようにするものです。既存の管理体制の認証を補完することを目指します。</p></details>
+      <details><summary>「数学的に安全」と証明する認証ですか？</summary><p>構想の中心は、共通基準と機械で検証できる証拠に基づく評価です。企業全体の安全性や、将来の事故ゼロを数学的に証明するものではありません。必要に応じて特定のルールや性質の形式検証を活用する場合も、その対象と前提条件を明示し、実際の処理・設定との対応を別に確かめます。</p></details>
+      <details><summary>公開情報を見るだけで認証できますか？</summary><p>公開情報による調査は、問題の候補を見つける入口です。認証構想では、対象組織の許可と協力の下で、実装・設定・検査・運用の記録を確認します。外から見える情報だけで、変更管理の体制や内部の対策まで確認済みとは扱いません。</p></details>
+      <details><summary>認証の申請や、認証企業の検索はできますか？</summary><p>認証制度と比較サイトは構想・設計段階です。評価基準、対象範囲、確認間隔、審査・異議申立ての運営方法などを具体化しています。現時点では、構想へのご意見や実証に向けたご相談を受け付けています。</p></details>
+    </section>
+
+    <section class="ev-section" aria-labelledby="references-title">
+      <h2 id="references-title">考え方の参照資料</h2>
+      <ol class="ev-source-list">
+        <li id="ref-ssdf"><a href="https://csrc.nist.gov/pubs/sp/800/218/final">NIST SP 800-218：Secure Software Development Framework v1.1</a><span>開発全体での役割、検査基準、証拠の保護、脆弱性への対応。</span></li>
+        <li id="ref-oscal"><a href="https://pages.nist.gov/OSCAL/about/">NIST：Open Security Controls Assessment Language（OSCAL）</a><span>実装・評価の情報を共通の機械可読な形式で扱う取り組み。</span></li>
+        <li id="ref-hash"><a href="https://csrc.nist.gov/pubs/fips/180-4/upd1/final">NIST FIPS 180-4：Secure Hash Standard</a><span>ハッシュによるデータ変更の検知。</span></li>
+        <li id="ref-vap"><a href="https://github.com/veritaschain/vap-spec/blob/81fa81e01ef9418c3fb7a02ddfc7fd72d993b6b1/spec/v1.2/VAP_Framework_Specification.md">VAP Framework Specification v1.2.0（Draft 3）</a><span>2026年10月26日に訂正を含む本文を再確認した固定版。EVIDECTでの連携は設計段階です。</span></li>
+        <li id="ref-iso"><a href="https://www.iso.org/standard/27001">ISO/IEC 27001：Information security management systems</a><span>情報セキュリティ管理の仕組みを確立・運用・維持・継続改善する規格。</span></li>
+      </ol>
+      <p class="ev-help">参照資料は、この認証構想への承認や、EVIDECTの適合認証を示すものではありません。</p>
+      <p><a class="ev-button" href="/contact/">構想・実証について相談する →</a></p>
+      <p><a href="/#design">AIセキュリティ調査の詳しい証拠設計を読む →</a></p>
+    </section>
+  </main>
+  <footer class="ev-footer"><div class="ev-footer-inner"><div><a class="ev-brand" href="/" aria-label="EVIDECT ホーム"><svg viewBox="0 0 36 40" fill="none" aria-hidden="true"><path d="M6 3h24v34H6zM12 21l6 6L29 11" stroke="currentColor" stroke-width="2.5"/></svg><span>EVIDECT<small>EVIDENCE · SECURITY · ACTION</small></span></a><p>確認できた事実と、まだ分からないことを。<br>次の対策につながる、セキュリティと証拠の設計。</p></div><nav aria-label="フッターナビゲーション"><a href="/certification/">認証構想</a><a href="/services/">サービス</a><a href="/support/">PHP・WordPress対応／料金</a><a href="/methodology/">調査と証拠設計</a><a href="/notices/ja/">セキュリティ通知</a><a href="/about/">運営情報</a><a href="/privacy/">プライバシー</a><a href="/contact/">お問い合わせ</a></nav></div><p class="ev-copy">© 2026 EVIDECT · 運営：VeritasChain株式会社 / VeritasChain Co., Ltd.</p></footer>
+</body>
+</html>
