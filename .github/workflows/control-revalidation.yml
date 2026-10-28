@@ -1,0 +1,48 @@
+name: Synthetic control revalidation
+on:
+  pull_request:
+    paths:
+      - 'examples/control-revalidation/**'
+      - 'docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md'
+      - '.github/workflows/control-revalidation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'examples/control-revalidation/**'
+      - 'docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md'
+      - '.github/workflows/control-revalidation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  demo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test state and existing site regressions
+        run: |
+          python3 -I -m unittest discover -s tests
+          node --test examples/control-revalidation/demo.test.mjs > demo-tests.tap
+          node examples/control-revalidation/demo.mjs > regenerated.json
+          node examples/control-revalidation/demo.mjs > regenerated-again.json
+          cmp regenerated.json regenerated-again.json
+      - name: Archive reproduction input and results
+        run: |
+          mkdir -p reproduction
+          git rev-parse HEAD > reproduction/SOURCE_COMMIT.txt
+          node --version > reproduction/NODE_VERSION.txt
+          cp demo-tests.tap regenerated.json reproduction/
+          git archive --format=zip --prefix=evidect-site/ HEAD > reproduction/source.zip
+          sha256sum reproduction/source.zip reproduction/regenerated.json > reproduction/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: control-revalidation-${{ github.sha }}
+          path: reproduction/
+          retention-days: 30
+          if-no-files-found: error
