@@ -111,7 +111,7 @@
       "name": "AIセキュリティ調査の監査証跡・証拠設計 | EVIDECT",
       "description": "AIによるセキュリティ調査で、許可・対象範囲・観測・判断をどう記録するか。VAP・OAP・DAPを参照し、脆弱性の候補と未確認条件、変更管理の証拠、記録から検証できることと限界を解説します。",
       "inLanguage": "ja",
-      "dateModified": "2026-10-26",
+      "dateModified": "2026-10-29",
       "isPartOf": {
         "@id": "https://evidect.veritaschain.org/#website"
       },
@@ -130,9 +130,54 @@
 </script>
 
 <link rel="stylesheet" href="/assets/css/evidect-site.css?v=20261026"><script src="/assets/js/evidect-site.js?v=20261024" defer></script><link rel="stylesheet" href="/assets/css/seo-navigation.css?v=20261026">
+<link rel="stylesheet" href="/assets/css/reproduction.css?v=20261029">
 </head><body class="ev-page"><a class="ev-skip" href="#main">本文へ移動</a><header class="ev-header"><div class="ev-bar"><a class="ev-brand" href="/" aria-label="EVIDECT ホーム"><svg viewBox="0 0 36 40" fill="none" aria-hidden="true"><path d="M6 3h24v34H6zM12 21l6 6L29 11" stroke="currentColor" stroke-width="2.5"/></svg><span>EVIDECT<small>EVIDENCE · SECURITY · ACTION</small></span></a><button class="ev-menu" type="button" aria-expanded="false" aria-controls="ev-nav">メニュー ☰</button><nav class="ev-nav" id="ev-nav" aria-label="メインナビゲーション"><a href="/certification/">認証構想</a><a href="/services/">サービス</a><a href="/methodology/" aria-current="page">調査と証拠設計</a><a href="/notices/ja/">通知を受け取った方へ</a><a href="/about/">運営情報</a><a href="/contact/" class="ev-contact">お問い合わせ</a></nav></div></header><main id="main" tabindex="-1">
 <nav class="ev-breadcrumb" aria-label="パンくず"><ol><li><a href="/">EVIDECT</a></li><li aria-current="page">調査と証拠設計</li></ol></nav>
-<div class="ev-intro"><p class="ev-kicker">OUR APPROACH</p><h1>根拠と限界を、<br>同じ場所に。</h1><p class="ev-lead">観測した事実、判断の根拠、未確認の条件を分けて記録する。EVIDECTが重視する調査の進め方と、証拠で確認できることの限界を説明します。</p></div>
+<div class="ev-intro"><p class="ev-kicker">OUR APPROACH</p><h1>根拠と限界を、<br>同じ場所に。</h1><p class="ev-lead">観測した事実、判断の根拠、未確認の条件を分けて記録する。EVIDECTが重視する調査の進め方と、証拠で確認できることの限界を説明します。</p><p><a href="#reproduce">実験ツールを自分の環境で試す →</a></p></div>
+<section class="ev-section ev-reproduce" id="reproduce" aria-labelledby="reproduce-title">
+  <p class="ev-kicker">TRY THE EXPERIMENTAL TOOLS</p>
+  <h2 id="reproduce-title">観測から報告書まで、自分の環境で試す</h2>
+  <p>合成ファイルだけを使い、観測・署名・受け渡し・受取側での再検証・日本語報告書の作成を、実際のCLIで22段階にわたって確認します。正常系だけでなく、変更・鍵不足・期限切れ・改変を拒否する動作も含みます。</p>
+  <div class="ev-note" id="reproduce-scope">
+    <strong>実験的な再現手順です。安全性の認証ではありません。</strong>
+    <p>本番AILEX・AWS・顧客データには接続しません。VAP／VCPの採択済み形式や適合認証を示すものでもありません。<code>PASS</code>は、拒否すべき入力の拒否も含めた「テストの期待結果と一致」の意味です。管理策・法令適合は<code>NOT_ASSESSED</code>のままです。</p>
+  </div>
+  <div class="ev-reproduce-steps">
+    <div><span class="ev-num" aria-hidden="true">01</span><h3>固定した版を確認</h3><p>対象はコミット<code>b394db7d39fbd50e54a8adae205cce594d784a32</code>です。動き続ける<code>main</code>と区別し、ソースを確認してから実行します。</p></div>
+    <div><span class="ev-num" aria-hidden="true">02</span><h3>ローカルで実行</h3><p>Linux／macOS、Python 3.10以上、Node.js 22系が必要です。追加のpip／npmパッケージは不要。ソース取得にはネット接続が必要ですが、通し検証はローカルで動きます。</p></div>
+    <div><span class="ev-num" aria-hidden="true">03</span><h3>実際の結果を報告</h3><p>成功・失敗・セットアップでの停止を同じ窓口で報告できます。期待値を写さず、実際に観測した結果と使用した版を記載してください。</p></div>
+  </div>
+  <h3 id="reproduce-command-title">取得と実行</h3>
+  <p id="reproduce-command-note">自分が管理できる場所で、新しい取得先と出力先を使用してください。既存の出力先は上書きしません。以下はシェルで実行するコマンドです。このページ上でコードを実行したり、ファイルを送信したりする機能はありません。</p>
+  <pre aria-labelledby="reproduce-command-title" aria-describedby="reproduce-command-note"><code>git clone https://github.com/veritaschain/evidect-site.git evidect-reproduction
+cd evidect-reproduction
+git checkout --detach b394db7d39fbd50e54a8adae205cce594d784a32
+git rev-parse HEAD
+git status --porcelain
+python3 --version
+node --version
+python3 -I -B tools/context-observer/walkthrough.py --output ./walkthrough-results</code></pre>
+  <p>最後のコマンドの終了コードと、新しく作られた<code>walkthrough-results/summary.json</code>の<code>test_result: PASS</code>・22段階の結果を確認します。失敗後に古いフォルダの結果を使わず、再試行は別の新規出力先にしてください。HTMLが存在するだけでは成功ではありません。</p>
+  <h3>期待する結果の読み方</h3>
+  <dl class="ev-reproduce-results">
+    <div><dt>正常・変更あり</dt><dd>ローカル検証は<code>VALID</code>、全体は<code>INDETERMINATE</code>。変更ありの記録は、正しく署名されていても再確認が必要です。</dd></div>
+    <div><dt>鍵・採用基準の不足、期限切れ</dt><dd><code>INDETERMINATE</code>。必要な条件が不足しているため、比較基準として使用しません。</dd></div>
+    <div><dt>別の鍵・基準との不一致・改変</dt><dd><code>INVALID</code>。確認した不一致を、合格や証拠不足に置き換えません。</dd></div>
+  </dl>
+  <p>外部アンカーは検証しません。署名の一致は、観測内容の真実性やサービスの安全性の証明ではありません。生成するHTML／JSON報告書は未署名で編集可能な派生物であり、原証拠や認証書ではありません。</p>
+  <p>送受信の信頼情報は同じテストプログラムが用意します。別フォルダは独立した管理者を意味しません。試験鍵と時刻は毎回変わるため、再現するのは判定・理由・終了コードであり、出力バイト列の一致ではありません。一時ファイルの通常削除は安全消去ではなく、強制終了時の残存は保証しません。</p>
+  <div class="ev-reproduce-actions">
+    <a class="ev-button" href="https://github.com/veritaschain/evidect-site/blob/1c0d5675751f6002a9ce4af4241fe427b8731e9c/docs/OBSERVATION_REPRODUCTION.md">固定版の詳しい手順（GitHub）</a>
+    <a class="ev-button" href="https://github.com/veritaschain/evidect-site/issues/new?template=observation-reproduction.md">再現結果を報告する（公開Issue）</a>
+  </div>
+  <div class="ev-note" id="reproduce-privacy">
+    <strong>報告は公開されます。秘密情報を添付しないでください。</strong>
+    <p>秘密鍵・認証情報・顧客情報・本番ソースや設定・実運用の証拠・端末ログ一式を投稿しないでください。氏名・組織名の公開は不要です。機密性のある不具合は、公開せず<code>security@veritaschain.org</code>へ最小限の説明から連絡してください。</p>
+    <p>報告は内容を確認するまで自己申告として扱います。Issueの作成や同じ実装の再実行だけで、独立実装・第三者認証・法令適合の実績にはしません。このページやツールから自動で報告を送信することはありません。</p>
+  </div>
+  <p class="ev-help" lang="en">English instructions and a bilingual reporting template are available through the links above. Synthetic inputs only. A passing test is not security certification or independent reproduction. Do not upload secrets or production evidence.</p>
+</section>
+
 <section class="ev-section"><div class="ev-row"><span class="ev-num">01</span><div><h2>対象・範囲を明確にする</h2><p>対象、作業の目的、許可された操作、実施期間を区別します。公開情報の観測と、個別の許可を必要とする調査・作業を混同しません。</p></div></div><div class="ev-row"><span class="ev-num">02</span><div><h2>観測と推定を分ける</h2><p>公開HTMLの製品名やバージョン表記は、観測した事実です。それだけで実稼働コードの版、修正適用の有無、脆弱性の成立や侵害を断定できません。</p></div></div><div class="ev-row"><span class="ev-num">03</span><div><h2>出典と確認条件を残す</h2><p>参照した公式情報、確認した日時・範囲、再確認に必要な条件を所見と結び付けます。未確認事項も記載し、受け取った担当者が次の確認を判断できるようにします。</p></div></div></section>
 <section class="ev-section" id="change-management-evidence"><h2>変更管理の体制と、実際の記録を照らし合わせる</h2><p>継続型認証の構想では、変更の手順や責任分担に加えて、その手順が実際に機能したかを確認する設計を検討しています。対象サービス・環境・期間を定め、次の記録を結び付けます。</p><div class="ev-row"><span class="ev-num">01</span><div><h3>変更・検査・承認の記録</h3><p>何を変更し、どの検査を行い、誰がどの版を承認したか。変更内容、検査結果、承認者、時刻を照合します。</p></div></div><div class="ev-row"><span class="ev-num">02</span><div><h3>本番に反映された内容</h3><p>検査・承認を経た版と、実際の本番のコードや設定が対応しているか。デプロイ記録と本番環境の確認結果を照らし合わせます。</p></div></div><div class="ev-row"><span class="ev-num">03</span><div><h3>直接・緊急変更と再確認</h3><p>通常の経路を通らない直接変更や緊急変更も対象に含め、理由、実行者、時刻、影響、事後確認を記録します。差分や記録の不足があれば、影響範囲を確認し、評価状態の見直しと再検証につなげます。</p></div></div><p>記録がそろうことと、安全な変更であることは別の確認事項です。評価では、記録の照合結果に加えて、検査の内容とその対象範囲を明示します。</p><p><a href="/certification/#change-management">継続型認証での変更管理の考え方を見る →</a></p></section>
 <section class="ev-section"><h2>記録の設計例</h2><div class="ev-note"><strong>例：公開ページに「demo-gallery 2.3.1」と表示されていた</strong><p>観測：公開HTMLに含まれた表記。<br>照合：デモ用アドバイザリの影響範囲。<br>未確認：実際のコード、個別修正、機能の有効化状況。<br>所見：追加確認が必要な候補。</p><p class="ev-help">合成データによる説明です。実在する脆弱性や調査結果ではありません。</p></div></section>

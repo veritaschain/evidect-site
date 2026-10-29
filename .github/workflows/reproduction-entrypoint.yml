@@ -1,0 +1,34 @@
+name: Public reproduction entrypoint
+on:
+  pull_request:
+    paths:
+      - 'methodology/**'
+      - 'assets/css/**'
+      - 'docs/OBSERVATION_REPRODUCTION.md'
+      - 'tests/**'
+      - 'seo.json'
+      - 'sitemap.xml'
+      - '.github/workflows/reproduction-entrypoint.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'methodology/**'
+      - 'assets/css/**'
+      - 'docs/OBSERVATION_REPRODUCTION.md'
+      - 'tests/**'
+      - 'seo.json'
+      - 'sitemap.xml'
+      - '.github/workflows/reproduction-entrypoint.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate new entrypoint and existing site regressions
+        run: python3 -I -B -m unittest discover -s tests -v

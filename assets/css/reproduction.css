@@ -1,0 +1,17 @@
+/* Scoped to the public reproduction entrypoint; no remote assets. */
+#reproduce { overflow-wrap: anywhere; }
+#reproduce .ev-reproduce-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 32px 0; }
+#reproduce .ev-reproduce-steps > div { padding: 22px; border: 1px solid #304655; border-radius: 8px; }
+#reproduce .ev-reproduce-steps h3 { margin-top: 12px; }
+#reproduce pre { max-width: 100%; padding: 22px; white-space: pre-wrap; overflow-wrap: anywhere; background: #081019; border: 1px solid #304655; border-radius: 8px; font-size: 14px; line-height: 1.9; }
+#reproduce code { font-family: ui-monospace, monospace; }
+#reproduce .ev-reproduce-results { margin: 20px 0 28px; }
+#reproduce .ev-reproduce-results > div { grid-template-columns: minmax(130px, 1fr) minmax(0, 3fr); }
+#reproduce .ev-reproduce-actions { display: flex; flex-wrap: wrap; gap: 16px; margin: 30px 0; }
+#reproduce .ev-reproduce-actions a { text-align: center; }
+@media (max-width: 760px) {
+  #reproduce .ev-reproduce-steps { grid-template-columns: minmax(0, 1fr); }
+  #reproduce .ev-reproduce-results > div { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  #reproduce .ev-reproduce-actions a { width: 100%; }
+  #reproduce pre { padding: 16px; font-size: 13px; }
+}
