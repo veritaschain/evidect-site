@@ -1,0 +1,48 @@
+name: Observation baseline authentication
+on:
+  pull_request:
+    paths:
+      - 'tools/context-observer/**'
+      - '.github/workflows/context-authentication.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/context-observer/**'
+      - '.github/workflows/context-authentication.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authenticate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test actual signatures, pinned baseline and file collection
+        shell: bash
+        run: |
+          mkdir -p authentication-results
+          git rev-parse HEAD > authentication-results/SOURCE_COMMIT.txt
+          python3 --version > authentication-results/ENVIRONMENT.txt
+          node --version >> authentication-results/ENVIRONMENT.txt
+          node --check tools/context-observer/receipt_crypto.mjs
+          python3 -I -B tools/context-observer/test_authenticated.py -v 2>&1 | tee authentication-results/authentication.log
+          python3 -I -B tools/context-observer/test_observe.py -v 2>&1 | tee authentication-results/observer.log
+          node --test examples/control-revalidation/demo.test.mjs | tee authentication-results/synthetic.log
+          python3 -I -B -m unittest discover -s tests -v 2>&1 | tee authentication-results/site.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: observation-authentication-${{ matrix.os }}-${{ github.run_id }}
+          path: authentication-results/
+          if-no-files-found: error
+          retention-days: 30
