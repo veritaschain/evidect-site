@@ -165,7 +165,7 @@ def run_case(browser, assets, width, javascript, output):
     page = context.new_page()
     page.set_default_timeout(10000)
     page.on('pageerror', lambda _: errors.append('PAGE_ERROR'))
-    page.on('response', responses.append)
+    page.on('response', lambda response: responses.append(response))
     page.on('requestfailed', lambda _: failed.append('REQUEST_FAILED'))
     label = str(width) + ('-js' if javascript else '-nojs')
     result = {'width': width, 'javascript': javascript, 'result': 'UNVERIFIED', 'checks': []}
