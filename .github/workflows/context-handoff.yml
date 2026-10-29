@@ -1,0 +1,45 @@
+name: Offline observation handoff
+on:
+  pull_request:
+    paths:
+      - 'tools/context-observer/**'
+      - '.github/workflows/context-handoff.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/context-observer/**'
+      - '.github/workflows/context-handoff.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  handoff:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test receiver-side verification and rejection paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p handoff-results
+          git rev-parse HEAD > handoff-results/SOURCE_COMMIT.txt
+          python3 --version > handoff-results/ENVIRONMENT.txt
+          node --version >> handoff-results/ENVIRONMENT.txt
+          python3 -I -B tools/context-observer/test_handoff.py -v 2>&1 | tee handoff-results/handoff.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: observation-handoff-${{ matrix.os }}-${{ github.run_id }}
+          path: handoff-results/
+          if-no-files-found: error
+          retention-days: 30
