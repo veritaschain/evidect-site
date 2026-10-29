@@ -129,7 +129,8 @@ class ReportTests(unittest.TestCase):
     def test_missing_key_is_not_a_success_and_suppresses_source_claims(self):
         r = self.build(trusted_public_key=None, include_context=True)
         self.assertFalse(r["baseline_usable_at_verification"])
-        self.assertEqual(r["local_status"], "INDETERMINATE")n        self.assertIsNone(r["source_claims"])
+        self.assertEqual(r["local_status"], "INDETERMINATE")
+        self.assertIsNone(r["source_claims"])
         self.assertEqual(r["context_disclosure"], "OMITTED")
         self.assertEqual(r["actions"][0]["code"], "DO_NOT_USE_BASELINE")
 
