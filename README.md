@@ -36,3 +36,13 @@ The form uses the existing native POST endpoint `https://formspree.io/f/xblvzzoo
 ## Search metadata
 
 Search titles, descriptions, structured data, icons, social previews and language alternates are maintained in `seo.json` and `scripts/update_seo.py`. See [SEO configuration and Google Trends rationale](docs/seo.md) for the observed queries, update procedure, validation and indexing follow-up.
+
+## Experimental observation tools
+
+The [one-command walkthrough](tools/context-observer/WALKTHROUGH.md) runs the actual local-file collector, detached-signature checks, offline handoff and receiver report using disposable synthetic files and fresh test-only keys. It includes expected failure cases and an external reproduction reporting template. No production source, customer data, network call or operational key is required. A passing test is not security certification or independent reproduction; VAP/VCP normative formats and the public website's product availability are unchanged.
+
+```sh
+python3 -I -B tools/context-observer/walkthrough.py --output ./walkthrough-results
+```
+
+Use reviewed, pinned source, Linux/macOS, Python 3.10+ and Node.js 22+. The output directory must not already exist. See the guide for generated reports, temporary-key cleanup limits, exact result meanings and the separate operational procedures.

@@ -1,0 +1,51 @@
+name: Synthetic observation walkthrough
+on:
+  pull_request:
+    paths:
+      - 'tools/context-observer/**'
+      - '.github/workflows/context-walkthrough.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/context-observer/**'
+      - '.github/workflows/context-walkthrough.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  walkthrough:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run integration acceptance and existing regressions
+        shell: bash
+        run: |
+          mkdir -p walkthrough-ci
+          { git rev-parse HEAD; python3 --version; node --version; } > walkthrough-ci/environment.txt
+          python3 -I -B tools/context-observer/test_walkthrough.py -v 2>&1 | tee walkthrough-ci/walkthrough-tests.txt
+          for suite in test_report test_handoff test_authenticated test_observe; do
+            python3 -I -B "tools/context-observer/${suite}.py" -v 2>&1 | tee "walkthrough-ci/${suite}.txt"
+          done
+          node --test examples/control-revalidation/demo.test.mjs 2>&1 | tee walkthrough-ci/synthetic-tests.txt
+          python3 -I -B -m unittest discover -s tests -v 2>&1 | tee walkthrough-ci/site-tests.txt
+      - name: Produce only synthetic receiver reports and an as-of summary
+        shell: bash
+        run: |
+          python3 -I -B tools/context-observer/walkthrough.py --output walkthrough-ci/sample-results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: walkthrough-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: walkthrough-ci/
+          if-no-files-found: error
+          retention-days: 30
