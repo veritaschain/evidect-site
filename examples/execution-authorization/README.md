@@ -82,8 +82,9 @@ CIはこのJSONを実際に生成して、既存の読み取り専用
 - **認証アダプターは未実装。** `session`と`state`は、テストプログラムが用意した信頼側入力です。
   HTTP本文・LLM出力の自己申告をここへ渡せば安全な認証にはなりません。実運用にはIDプロバイダ、
   セッション検証、発行者と実行主体の束縛が必要です。両方の試験鍵を同じプログラムが管理しています。
-- **単一プロセスの限定試験。** nonce消費とツール呼び出しは同期処理で、間に`await`はありません。
-  再起動・複数ワーカー・別経路・DB取引・ネットワークをまたぐ原子性は未対応です。
+- **既定デモは単一プロセスの限定試験。** nonce消費とツール呼び出しは同期処理で、間に`await`はありません。
+  既定のメモリ保存は再起動や複数ワーカーに対応しません。別途の[SQLite実験](DURABLE_REPLAY.md)は
+  同じローカルDBを共有するプロセスで予約を保持しますが、別経路・実ツール・ネットワークをまたぐ原子性は未対応です。
   本番では耐久性のある一回限りの消費、競合制御、冪等性・失敗時の回復手順が必要です。
 - **ポリシー管理者を信頼。** 現在時刻・版・世代・失効一覧は合成状態です。信頼時刻、永続的な単調増加、
   巻き戻し耐性、鍵のローテーションや失効配送、管理者承認経路は検証していません。
@@ -112,3 +113,10 @@ The tests inspect actual call/effect counters rather than inferring non-executio
 The same-process harness supplies identities, approvals, policy and keys; it is not a production identity
 provider, independent authority, persistent replay service, certification, or normative VAP/VCP format.
 Reports are unsigned. The existing observer may capture their bytes without elevating their assurance.
+
+## Optional persistent replay experiment / 任意の永続化試験
+
+[再起動・同一ホスト内の競合をまたぐ再送防止](DURABLE_REPLAY.md)は、Node.js 22.16.0以上で
+動く追加実験です。実際の別プロセス、4ワーカー競合、予約直後の強制終了を試験します。
+元の18ケース・37テストと保証範囲を混同しません。DBの古いコピーへの巻き戻しや
+実ツールとのexactly-onceは未対応です。全出力で本番・法令適合・独立再現は未評価のままです。
