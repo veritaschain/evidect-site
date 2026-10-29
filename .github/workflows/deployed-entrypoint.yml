@@ -1,0 +1,59 @@
+name: Deployed reproduction entrypoint
+on:
+  pull_request:
+    paths:
+      - 'tools/site-verification/**'
+      - '.github/workflows/deployed-entrypoint.yml'
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: 'Full deployed source commit (empty uses this main revision)'
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test bounded transport and existing site contracts
+        run: |
+          python3 -I -B tools/site-verification/test_probe.py -v
+          python3 -I -B -m unittest discover -s tests -v
+  public-http:
+    needs: unit
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Compare fixed public URLs against the selected source commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.base.sha || github.event.workflow_run.head_sha || inputs.expected_commit || github.sha }}
+        run: |
+          mkdir -p live-entrypoint-results
+          { git rev-parse HEAD; python3 --version; } > live-entrypoint-results/environment.txt
+          python3 -I -B tools/site-verification/probe.py \
+            --expected-commit "$EXPECTED_COMMIT" \
+            --output live-entrypoint-results/observation.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: live-entrypoint-${{ github.run_id }}-${{ github.run_attempt }}
+          path: live-entrypoint-results/
+          if-no-files-found: error
+          retention-days: 30
