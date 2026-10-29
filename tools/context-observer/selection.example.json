@@ -1,0 +1,15 @@
+{
+  "format": "evidect-context-selection/1",
+  "context": {
+    "service": "EVIDECT-source-example",
+    "environment": "source-checkout",
+    "release": "operator-must-set-reviewed-revision",
+    "scope": "two-public-example-files-only",
+    "policy_revision": "illustrative-file-observation/0.1",
+    "generation": 1
+  },
+  "files": [
+    "examples/control-revalidation/README.md",
+    "examples/control-revalidation/demo.mjs"
+  ]
+}

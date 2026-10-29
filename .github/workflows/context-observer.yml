@@ -1,0 +1,75 @@
+name: Read-only context observer
+on:
+  pull_request:
+    paths:
+      - 'tools/context-observer/**'
+      - 'examples/control-revalidation/**'
+      - '.github/workflows/context-observer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/context-observer/**'
+      - 'examples/control-revalidation/**'
+      - '.github/workflows/context-observer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test observer and existing source regressions
+        shell: bash
+        run: |
+          python3 --version
+          node --version
+          python3 -I -B tools/context-observer/test_observe.py -v
+          python3 -I -B -m unittest discover -s tests
+          node --test examples/control-revalidation/demo.test.mjs
+      - name: Read public checked-out example files, not a production deployment
+        shell: bash
+        env:
+          RECEIPTS: ${{ runner.temp }}/evidect-context-receipts
+        run: |
+          mkdir "$RECEIPTS"
+          git rev-parse HEAD > "$RECEIPTS/SOURCE_COMMIT.txt"
+          python3 -I -B - <<'PY'
+          import json, os
+          from pathlib import Path
+          destination = Path(os.environ['RECEIPTS'])
+          selection = json.loads(Path('tools/context-observer/selection.example.json').read_text())
+          selection['context']['release'] = (destination / 'SOURCE_COMMIT.txt').read_text().strip()
+          (destination / 'selection.json').write_text(json.dumps(selection))
+          PY
+          python3 -I -B tools/context-observer/observe.py --root "$PWD" --manifest "$RECEIPTS/selection.json" --output "$RECEIPTS/first.json"
+          python3 -I -B tools/context-observer/observe.py --root "$PWD" --manifest "$RECEIPTS/selection.json" --previous "$RECEIPTS/first.json" --output "$RECEIPTS/second.json"
+          python3 -I -B - <<'PY'
+          import json, os
+          from pathlib import Path
+          output = Path(os.environ['RECEIPTS'])
+          a, b = [json.loads((output / name).read_text()) for name in ('first.json', 'second.json')]
+          assert a['comparison']['state'] == 'BASELINE_REQUIRED'
+          assert b['comparison']['state'] == 'NO_CHANGE_IN_OBSERVED_SCOPE'
+          assert a['context_digest'] == b['context_digest']
+          assert b['comparison']['control_status'] == 'NOT_ASSESSED'
+          assert b['limits']['production_observed'] is False
+          PY
+          git diff --exit-code
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: success()
+        with:
+          name: context-observer-${{ matrix.os }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/evidect-context-receipts/
+          if-no-files-found: error
+          retention-days: 30
