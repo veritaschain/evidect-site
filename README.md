@@ -48,3 +48,12 @@ python3 -I -B tools/context-observer/walkthrough.py --output ./walkthrough-resul
 Use reviewed, pinned source, Linux/macOS, Python 3.10+ and Node.js 22+. The output directory must not already exist. See the guide for generated reports, temporary-key cleanup limits, exact result meanings and the separate operational procedures.
 
 For a version-pinned external trial, start with [the reproduction entrypoint](docs/OBSERVATION_REPRODUCTION.md), then use the [public reproduction report template](https://github.com/veritaschain/evidect-site/issues/new?template=observation-reproduction.md). Success, failure and setup blockers are all useful. Do not post secrets or production evidence; submitting an issue does not itself establish independent reproduction or certification.
+
+## Experimental execution authorization
+
+The [authorization experiment](examples/execution-authorization/README.md) separates signed requests, independently configured approval keys, current runtime permission checks and observed effects of a harmless in-memory tool. It tests that a correctly signed but unauthorized request produces zero tool calls, and rechecks revocation, expiry, approval binding and nonce reuse at dispatch. The same-process synthetic harness is not a production identity provider or independent assessment. Reports remain unsigned; actual production controls and legal compliance remain NOT_ASSESSED.
+
+```sh
+node --test examples/execution-authorization/gate.test.mjs
+node examples/execution-authorization/demo.mjs
+```
