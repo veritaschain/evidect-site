@@ -26,8 +26,6 @@ jobs:
         os: [ubuntu-24.04, macos-14]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    env:
-      RESULTS: ${{ runner.temp }}/evidect-authorization-results
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -37,6 +35,8 @@ jobs:
           node-version: '22'
       - name: Test actual gate effects and existing regressions
         shell: bash
+        env:
+          RESULTS: ${{ runner.temp }}/evidect-authorization-results
         run: |
           set -euo pipefail
           mkdir -m 700 "$RESULTS"
@@ -47,6 +47,8 @@ jobs:
           python3 -I -B -m unittest discover -s tests -v
       - name: Observe the generated synthetic result with the existing collector
         shell: bash
+        env:
+          RESULTS: ${{ runner.temp }}/evidect-authorization-results
         run: |
           set -euo pipefail
           umask 077
