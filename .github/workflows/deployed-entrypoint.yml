@@ -24,6 +24,7 @@ jobs:
       - name: Test bounded transport and existing site contracts
         run: |
           python3 -I -B tools/site-verification/test_probe.py -v
+          python3 -I -B tools/site-verification/test_browser_check.py -v
           python3 -I -B -m unittest discover -s tests -v
   public-http:
     needs: unit
@@ -53,4 +54,32 @@ jobs:
           name: live-entrypoint-${{ github.run_id }}-${{ github.run_attempt }}
           path: live-entrypoint-results/
           if-no-files-found: error
+          retention-days: 30
+  public-browser:
+    needs: public-http
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install pinned browser-test tooling in a disposable environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/evidect-browser-venv"
+          "$RUNNER_TEMP/evidect-browser-venv/bin/python" -m pip install --disable-pip-version-check --only-binary=:all: \
+            playwright==1.57.0 pyee==13.0.1 greenlet==3.5.1 typing_extensions==4.15.0
+          "$RUNNER_TEMP/evidect-browser-venv/bin/python" -m playwright install --with-deps chromium
+      - name: Verify actual public page at four widths with and without JavaScript
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.base.sha || github.event.build.commit || inputs.expected_commit || github.sha }}
+        run: |
+          "$RUNNER_TEMP/evidect-browser-venv/bin/python" -I -B tools/site-verification/browser_check.py \
+            --expected-commit "$EXPECTED_COMMIT" --output live-browser-results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: live-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: live-browser-results/
+          if-no-files-found: warn
           retention-days: 30
