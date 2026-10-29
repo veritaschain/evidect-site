@@ -59,7 +59,8 @@ GitHubのジョブ全体には別途5分の上限を設けています。1回に
 
 CIは新規検査コードのPRでオフライン単体テストと既存サイトテストを実行します。
 同一リポジトリ内のPRでは公開サイトを**PRのbaseコミット**と照合します。PRの未配信内容とは比較しません。
-Pagesのmain配信成功後は、`workflow_run`の配信元コミットと照合します。
+Pagesのビルド完了通知 `page_build` で `built` を確認し、その `build.commit` と照合します。
+対象はこのリポジトリのmainです。通知時点でCDN配信が未反映なら、成功へ置き換えず不一致を残します。
 手動実行はmainに限定し、明示したコミットまたはそのmain版を使います。
 `contents: read`のみ、checkout認証を保存せず、秘密情報・非公開成果物・キャッシュを使用しません。
 他リポジトリのPRから公開照合を起動しません。定期実行や外部への通知・投稿は追加しません。
@@ -76,4 +77,11 @@ HTMLの描画、操作、アクセシビリティ、リンク先GitHubのIssue�
 
 参考API:
 - https://docs.python.org/3.13/library/http.client.html
-- https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run
+- https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#page_build
+
+## 起動条件の修正履歴
+
+2026-10-29: PR #16で実HTTPS照合は成功しましたが、組み込みのPagesジョブ完了に対する
+`workflow_run`の起動記録を確認できませんでした。起動の不在だけからサービス障害とは断定せず、
+公式のPages用イベント `page_build` に変更しました。PR時のbaseコミット照合と手動実行は維持します。
+自動起動の実績は、この設定の存在ではなく、実際のイベント・ジョブ結果で確認してください。
