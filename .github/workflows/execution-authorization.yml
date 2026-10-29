@@ -42,6 +42,7 @@ jobs:
           mkdir -m 700 "$RESULTS"
           { git rev-parse HEAD; node --version; python3 --version; } > "$RESULTS/environment.txt"
           node --test examples/execution-authorization/gate.test.mjs 2>&1 | tee "$RESULTS/authorization-tests.tap"
+          node --test examples/execution-authorization/durable-replay.test.mjs 2>&1 | tee "$RESULTS/durable-replay-tests.tap"
           node --test examples/control-revalidation/demo.test.mjs
           python3 -I -B tools/context-observer/test_observe.py -v
           python3 -I -B -m unittest discover -s tests -v
@@ -54,6 +55,7 @@ jobs:
           umask 077
           mkdir "$RESULTS/synthetic"
           node examples/execution-authorization/demo.mjs > "$RESULTS/synthetic/authorization.json"
+          node examples/execution-authorization/durable-demo.mjs > "$RESULTS/synthetic/durable-authorization.json"
           python3 -I -B - <<'PY'
           import hashlib, json, os, subprocess
           from pathlib import Path
@@ -61,8 +63,8 @@ jobs:
           commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
           manifest = {'format': 'evidect-context-selection/1', 'context': {
               'service': 'authorization-fixture', 'environment': 'synthetic', 'release': commit,
-              'scope': 'one-synthetic-result', 'policy_revision': 'experimental-v1', 'generation': 1},
-              'files': ['authorization.json']}
+              'scope': 'two-synthetic-results', 'policy_revision': 'experimental-v1', 'generation': 1},
+              'files': ['authorization.json', 'durable-authorization.json']}
           (root / 'selection.json').write_text(json.dumps(manifest))
           sources = {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in sorted(Path('examples/execution-authorization').glob('*')) if p.is_file()}
@@ -75,14 +77,21 @@ jobs:
           root = Path(os.environ['RESULTS'])
           report = json.loads((root / 'synthetic/authorization.json').read_text())
           receipt = json.loads((root / 'observation.json').read_text())
+          durable = json.loads((root / 'synthetic/durable-authorization.json').read_text())
           ok = (report['test_result'] == 'PASS' and len(report['cases']) == 18
                 and all(c['observed_tool_calls_delta'] == 0 for c in report['cases'] if c['authorization'] == 'DENY')
                 and report['production_observed'] is False and report['report_signed'] is False
+                and durable['test_result'] == 'PASS' and len(durable['cases']) == 4
+                and durable['cases'][1]['total_observed_tool_calls'] == 1
+                and durable['database_rollback_protected'] is False
+                and durable['production_observed'] is False and durable['report_signed'] is False
+                and durable['control_status'] == 'NOT_ASSESSED'
+                and durable['legal_compliance'] == 'NOT_ASSESSED'
                 and receipt['comparison']['state'] == 'BASELINE_REQUIRED'
                 and receipt['comparison']['control_status'] == 'NOT_ASSESSED'
                 and receipt['limits']['production_observed'] is False)
           if not ok: raise SystemExit('Unexpected observation or assurance state')
-          print('18 synthetic cases observed; control/legal assessment remains NOT_ASSESSED')
+          print('18 in-process cases and 4 actual-process scenarios observed; controls/legal NOT_ASSESSED')
           PY
           git diff --exit-code
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

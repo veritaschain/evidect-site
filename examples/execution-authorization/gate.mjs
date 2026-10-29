@@ -1,4 +1,4 @@
-/** Experimental, synchronous, in-memory authorization gate. Not a production adapter. */
+/** Experimental, synchronous authorization fixture (in-memory tool; optional replay store). Not a production adapter. */
 import { createHash, sign, verify } from 'node:crypto';
 
 const REQUEST_DOMAIN = 'EVIDECT-EXPERIMENTAL-REQUEST/1\0';
@@ -95,12 +95,27 @@ function open(envelope, keys, snapshot, bytes, subjectField) {
 /**
  * state and session are TRUSTED harness inputs, not assertions read from a task.
  * The gate owns the only toy tool. No callback, shell, file path or URL is a task capability.
- * Replay storage and current policy are process-local, not durable/distributed authority.
+ * Current policy is a trusted process-local input. An optional synchronous replay
+ * store can reserve nonces across local processes; this is not distributed authority.
  */
-export function createGate({ issuerKeys, approverKeys, state, simulatePartialFailure = false }) {
+export function createGate({ issuerKeys, approverKeys, state, simulatePartialFailure = false, replayStore = null }) {
   const requestTrust = trustMap(issuerKeys), approvalTrust = trustMap(approverKeys);
   requireInput(typeof simulatePartialFailure === 'boolean');
   const consumed = new Set(), markers = [];
+  let hasReplay = key => consumed.has(key);
+  let consumeReplay = key => {
+    if (consumed.has(key)) return false;
+    consumed.add(key); return true;
+  };
+  if (replayStore !== null) {
+    // Operator-supplied trusted adapter, never taken from a task or model output.
+    // Snapshot only ordinary data methods; reject async/non-boolean responses below.
+    const h = Object.getOwnPropertyDescriptor(replayStore, 'has');
+    const c = Object.getOwnPropertyDescriptor(replayStore, 'consume');
+    requireInput(h && c && typeof h.value === 'function' && typeof c.value === 'function');
+    hasReplay = h.value.bind(replayStore);
+    consumeReplay = c.value.bind(replayStore);
+  }
   let calls = 0;
   function evaluate(envelope, approval, session) {
     const r = open(envelope, requestTrust, requestSnapshot, requestBytes, 'issuer');
@@ -136,7 +151,11 @@ export function createGate({ issuerKeys, approverKeys, state, simulatePartialFai
     if (current.now < task.issuedAt || current.now >= task.expiresAt) return deny('REQUEST_OUTSIDE_VALIDITY');
     if (current.revokedTasks.includes(task.taskId) || current.revokedSubjects.includes(task.issuer)) return deny('REQUEST_REVOKED');
     const replayKey = task.issuer + '\0' + task.nonce;
-    if (consumed.has(replayKey)) return deny('REQUEST_ALREADY_CONSUMED');
+    try {
+      const seen = hasReplay(replayKey);
+      requireInput(typeof seen === 'boolean');
+      if (seen) return deny('REQUEST_ALREADY_CONSUMED');
+    } catch { return deny('REPLAY_STATE_UNAVAILABLE'); }
     if (task.action !== 'append_marker') return deny('TOOL_NOT_ALLOWED');
     if (!current.grants.some(g => g.subject === task.issuer && g.agent === task.agent &&
         g.tenant === task.tenant && g.resource === task.resource && g.action === task.action)) return deny('SCOPE_NOT_GRANTED');
@@ -161,7 +180,17 @@ export function createGate({ issuerKeys, approverKeys, state, simulatePartialFai
       if (d.authorization === 'ALLOW') {
         // No await between current-state checks, reservation and the synchronous toy tool.
         // Reserve BEFORE invoking: a failed/partial execution must not enable automatic replay.
-        consumed.add(d.replayKey);
+        // An advisory has() is not a reservation: another process may win the race.
+        try {
+          const claimed = consumeReplay(d.replayKey, d.request_digest);
+          requireInput(typeof claimed === 'boolean');
+          if (!claimed) return Object.freeze({ ...publicDecision(d), authorization: 'DENY',
+            reason: 'REQUEST_ALREADY_CONSUMED', execution });
+        } catch {
+          // Includes ambiguous commit failures. Never fall back to the in-memory set.
+          return Object.freeze({ ...publicDecision(d), authorization: 'DENY',
+            reason: 'REPLAY_STATE_UNAVAILABLE', execution });
+        }
         try {
           calls += 1;
           markers.push(d.task.args.marker);
