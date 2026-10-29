@@ -5,6 +5,7 @@ from pathlib import Path
 import stat
 import tempfile
 import unittest
+from unittest.mock import Mock
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('browser_check_tested', HERE / 'browser_check.py')
@@ -112,6 +113,22 @@ class BrowserPolicyTests(unittest.TestCase):
     def test_cli_rejects_invalid_commit_and_repeated_arguments(self):
         self.assertEqual(b.main(['--expected-commit', 'main', '--output', '/unused']), 2)
         self.assertEqual(b.main(['--expected-commit', 'a' * 40, '--output', '/unused', '--output', '/unused']), 2)
+
+    def test_event_callbacks_accept_playwright_wrapper_attributes(self):
+        # Playwright decorates callbacks. Built-in list.append cannot be decorated.
+        browser, context, page = Mock(), Mock(), Mock()
+        browser.new_context.return_value = context
+        context.new_page.return_value = page
+        def register(event, callback):
+            setattr(callback, '_pw_impl_instance_', object())
+        page.on.side_effect = register
+        page.goto.side_effect = RuntimeError('simulated transport failure')
+        with tempfile.TemporaryDirectory() as d:
+            result = b.run_case(browser, self.assets, 390, True, Path(d))
+        self.assertEqual(result['result'], 'UNVERIFIED')
+        self.assertEqual(page.on.call_count, 3)
+        context.close.assert_called_once()
+        page.screenshot.assert_not_called()
 
     def test_existing_output_fails_before_browser_or_source_loading(self):
         with tempfile.TemporaryDirectory() as d:
