@@ -4,10 +4,7 @@ on:
     paths:
       - 'tools/site-verification/**'
       - '.github/workflows/deployed-entrypoint.yml'
-  workflow_run:
-    workflows: ['pages build and deployment']
-    types: [completed]
-    branches: [main]
+  page_build:
   workflow_dispatch:
     inputs:
       expected_commit:
@@ -32,7 +29,7 @@ jobs:
     needs: unit
     if: >-
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'page_build' && github.event.build.status == 'built' && github.event.build.commit != '' && github.event.repository.full_name == github.repository && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -43,7 +40,7 @@ jobs:
           fetch-depth: 0
       - name: Compare fixed public URLs against the selected source commit
         env:
-          EXPECTED_COMMIT: ${{ github.event.pull_request.base.sha || github.event.workflow_run.head_sha || inputs.expected_commit || github.sha }}
+          EXPECTED_COMMIT: ${{ github.event.pull_request.base.sha || github.event.build.commit || inputs.expected_commit || github.sha }}
         run: |
           mkdir -p live-entrypoint-results
           { git rev-parse HEAD; python3 --version; } > live-entrypoint-results/environment.txt
