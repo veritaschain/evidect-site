@@ -48,6 +48,8 @@ jobs:
         run: python -W error::ResourceWarning -m unittest discover -s tests -v
       - name: Execute and recheck saved synthetic intake frames
         run: python -I -B demo.py --vap-source "$EVIDECT_VAP_SOURCE" --output generated
+      - name: Execute and recheck saved synthetic follow-up frames
+        run: python -I -B followup_demo.py --vap-source "$EVIDECT_VAP_SOURCE" --output generated-followup
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -55,5 +57,7 @@ jobs:
           path: |
             examples/retention-evidence-intake/generated/summary.json
             examples/retention-evidence-intake/generated/frames/
+            examples/retention-evidence-intake/generated-followup/summary.json
+            examples/retention-evidence-intake/generated-followup/frames/
           if-no-files-found: error
           retention-days: 30

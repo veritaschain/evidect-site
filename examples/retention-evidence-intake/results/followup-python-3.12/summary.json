@@ -1,0 +1,167 @@
+{
+  "created_at": "2026-10-30T22:39:39.346741+00:00",
+  "fixture_case": "RT-01",
+  "fixture_summary_raw_sha256": "96b7ad9c574a3777fc9366dc9e5b3cf763cfce099e4e1b0771e203788774873f",
+  "format": "evidect-retention-followup-demo/0.1",
+  "frame_count": 4,
+  "frames": {
+    "RF-01": {
+      "expected": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "REVALIDATION_REQUIRED",
+        "retained_reason": "RETENTION_DEADLINE_RECHECK_REQUIRED",
+        "schedule_state": "BEFORE_DUE"
+      },
+      "files": {
+        "assignment.json": "52c41949f36513db1608de1e7822de3192ecac20c4227e557adeda68d3df4476",
+        "report.json": "89887683e0e5bf7a4004fd18eef2de84310e019cff9f0daf2b79d13709523c1c",
+        "snapshots/origin/binding.json": "c2692790d135f3f028da312393020574873d26f2a21e7046bec4314da3dba712",
+        "snapshots/origin/current.json": "945d43d4c0580ea2ce2b386913093d0a9afff1d8fc0a8f94302318bc577d13bc",
+        "snapshots/origin/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+        "snapshots/origin/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+      },
+      "historical_intake_reports_unchanged": true,
+      "matches_expectations": true,
+      "observed": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "REVALIDATION_REQUIRED",
+        "schedule_state": "BEFORE_DUE"
+      },
+      "saved_inputs_rechecked": true,
+      "snapshot_ids": [
+        "origin"
+      ]
+    },
+    "RF-02": {
+      "expected": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "REVALIDATION_REQUIRED",
+        "retained_reason": "RETENTION_DEADLINE_RECHECK_REQUIRED",
+        "schedule_state": "DUE_OR_OVERDUE"
+      },
+      "files": {
+        "assignment.json": "12942154840e25f9df170c9937a877e05a5ea62ce7da0382063af64828968a0b",
+        "report.json": "13d4a54506c4d1c7cef6e8070fb2454372e216dc0ee07893a259c2ca7d7fd2d0",
+        "snapshots/at-work-deadline/binding.json": "c2692790d135f3f028da312393020574873d26f2a21e7046bec4314da3dba712",
+        "snapshots/at-work-deadline/current.json": "38c9202309b761f2e9da212a2e49bea3e2e0cd71efc140abba6e8d09d2e47ebd",
+        "snapshots/at-work-deadline/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+        "snapshots/at-work-deadline/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715",
+        "snapshots/origin/binding.json": "c2692790d135f3f028da312393020574873d26f2a21e7046bec4314da3dba712",
+        "snapshots/origin/current.json": "945d43d4c0580ea2ce2b386913093d0a9afff1d8fc0a8f94302318bc577d13bc",
+        "snapshots/origin/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+        "snapshots/origin/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+      },
+      "historical_intake_reports_unchanged": true,
+      "matches_expectations": true,
+      "observed": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "REVALIDATION_REQUIRED",
+        "schedule_state": "DUE_OR_OVERDUE"
+      },
+      "saved_inputs_rechecked": true,
+      "snapshot_ids": [
+        "origin",
+        "at-work-deadline"
+      ]
+    },
+    "RF-03": {
+      "expected": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "READY_FOR_SCOPED_REVIEW",
+        "retained_reason": "SIGNATURE_MISMATCH",
+        "schedule_state": "BEFORE_DUE"
+      },
+      "files": {
+        "assignment.json": "25e03d49b144af8634fbafa3cb3df6c06ece358bcc735c16c85cd497142944e9",
+        "report.json": "6801a99a0db1dd54f0b7331fd9b9873d9ee3b501719e981b8ebd36c41dc89e1b",
+        "snapshots/corrected-input/binding.json": "c2692790d135f3f028da312393020574873d26f2a21e7046bec4314da3dba712",
+        "snapshots/corrected-input/current.json": "dfc9c9c51d3494945fec7a5068752ff50960cd1cbdb46e9cfd50d0f3b1ea073d",
+        "snapshots/corrected-input/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+        "snapshots/corrected-input/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715",
+        "snapshots/invalid-origin/binding.json": "35f965a2dbc08c307e9aaf3b89ceba2b18629509dca23958bb4c9eb0fa5060fe",
+        "snapshots/invalid-origin/current.json": "dfc9c9c51d3494945fec7a5068752ff50960cd1cbdb46e9cfd50d0f3b1ea073d",
+        "snapshots/invalid-origin/input.json": "2da351fbd359aa853346aabe95b20c15592b78ba71d42facf66c8edaf13a4cd5",
+        "snapshots/invalid-origin/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+      },
+      "historical_intake_reports_unchanged": true,
+      "matches_expectations": true,
+      "observed": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "READY_FOR_SCOPED_REVIEW",
+        "schedule_state": "BEFORE_DUE"
+      },
+      "saved_inputs_rechecked": true,
+      "snapshot_ids": [
+        "invalid-origin",
+        "corrected-input"
+      ]
+    },
+    "RF-04": {
+      "expected": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "REVALIDATION_REQUIRED",
+        "retained_reason": "RETENTION_DEADLINE_RECHECK_REQUIRED",
+        "schedule_state": "BEFORE_DUE"
+      },
+      "files": {
+        "assignment.json": "1de3f7064c324c762f6145afba5948a7e8938a93b1078ea7b83b27848b7b6db0",
+        "report.json": "28a504401787bfbe7dc7a6e8ca0386a3eea22a4d89d893c5fbdff0af0bcbda83",
+        "snapshots/new-context/binding.json": "cdcea3b2ef3159853bc6376cbb55365ea4b6241acb7dac9af480a1bbca81f4bc",
+        "snapshots/new-context/current.json": "8c281626086e71bb2a5a62729d1ce2950169d56da4c3ad191dde187e176ed68d",
+        "snapshots/new-context/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+        "snapshots/new-context/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715",
+        "snapshots/origin/binding.json": "c2692790d135f3f028da312393020574873d26f2a21e7046bec4314da3dba712",
+        "snapshots/origin/current.json": "945d43d4c0580ea2ce2b386913093d0a9afff1d8fc0a8f94302318bc577d13bc",
+        "snapshots/origin/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+        "snapshots/origin/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+      },
+      "historical_intake_reports_unchanged": true,
+      "matches_expectations": true,
+      "observed": {
+        "case_status": "OPEN",
+        "latest_evidence_status": "VALID",
+        "latest_review_status": "REVALIDATION_REQUIRED",
+        "schedule_state": "BEFORE_DUE"
+      },
+      "saved_inputs_rechecked": true,
+      "snapshot_ids": [
+        "origin",
+        "new-context"
+      ]
+    }
+  },
+  "historical_intake_reports_unchanged": true,
+  "limitations": "Internal synthetic frames from one public VAP fixture. Receiver assignments and keys share one controller; no notification, production case history, control approval or independent reproduction is established.",
+  "matched": 4,
+  "python_version": "3.12.14",
+  "rechecked": 4,
+  "source_manifest": {
+    ".github/workflows/retention-evidence-intake.yml": "e3ece60db16e1975ee098ca55b25a334aec705650744877df6c2805ae95b8489",
+    "examples/retention-evidence-intake/CONTRACT.md": "af178431ca54e345c7aaa1b0d1a8dd7a6953c3bb53bd2786d2cec4c9ed4b2a52",
+    "examples/retention-evidence-intake/FOLLOWUP.md": "792dfcb976a26b3c6a02c80f4d8e96a27a86df975178002624a2a3dc76e309a9",
+    "examples/retention-evidence-intake/demo.py": "48aef687c06778915ed4c8a5dfda125007f9e96016400977f6e1d3fa668d7742",
+    "examples/retention-evidence-intake/followup.py": "fa28931a0a5990a8606a70d9d7400e0443a8ea5f531e3d0fb91afd786eee90c3",
+    "examples/retention-evidence-intake/followup_demo.py": "8acbaaffe1e3150bb3910d06baf2700538d1c2ca7d560cbeac24a67617167851",
+    "examples/retention-evidence-intake/intake.py": "807c809dc5da6082f4eff344b3995cdd5bb6b2812a40786d4bd5090bb74d846a",
+    "examples/retention-evidence-intake/requirements.txt": "4e8db0811dba93c1aee12da58f14aa31f96051d04783f156ea8fb15391f821d6",
+    "examples/retention-evidence-intake/retention_intake/__init__.py": "54c41c58686f7fc42ced7b409af861b0b423a12b86e3b924e1930f1218cef339",
+    "examples/retention-evidence-intake/retention_intake/__main__.py": "ceeada83e9c5669c23f9210d719e81ae1102cced69407fa3bbbac3d99108370c",
+    "examples/retention-evidence-intake/retention_intake/core.py": "741feeb12b036d27d8ab08f82f8c7eeccf6dbd36076d0a9915b31e8ec8818b5e",
+    "examples/retention-evidence-intake/retention_intake/followup.py": "c1e09c83967fcaa7acac84160492d3bcd7707033d1d91b4d5e92c1474a630ed4",
+    "examples/retention-evidence-intake/retention_intake/model.py": "b400074e007a2c213f68f4d0b57241d2177046db252c45b3f5fa9a5c83cc523c",
+    "examples/retention-evidence-intake/retention_intake/source.py": "9683692cea656e067c6488fb05bf9cd4ae952f63a12b20c26c5dc222d9a11f02",
+    "examples/retention-evidence-intake/retention_intake/worker.py": "fd2a185a223144fc57b2ea8b07b098dd295d661ea0a2b94a8745bf42758ae2cc",
+    "examples/retention-evidence-intake/test_support.py": "7b414dd4e0d94523e76e88e2fff5fe91991863ab470f2e8bd0c615a8611987c8",
+    "examples/retention-evidence-intake/tests/test_followup.py": "320ba1948cee180fbfbad9424074d313f6c3361cad64695f94344fbaf9f75d51",
+    "examples/retention-evidence-intake/tests/test_intake.py": "19184b5fbb15fafb55d01acc7ab787d7c4621f5c9b617094a89ef1a8cc39ab00",
+    "examples/retention-evidence-intake/upstream-pin.json": "22ca2ba7dcbb1996e746b593be0737e8a837ac54f79c35b5ab856a44fa84254a"
+  },
+  "upstream_commit": "62d15f1b8d3c46a1704acb7c0d5631622e1a5608"
+}

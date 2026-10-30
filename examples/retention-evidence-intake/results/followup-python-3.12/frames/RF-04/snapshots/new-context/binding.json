@@ -1,0 +1,17 @@
+{
+  "binding_id": "synthetic-followup-binding-3",
+  "context": {
+    "config_digest": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "environment": "synthetic",
+    "generation": 3,
+    "policy_revision": "receiver-followup-demo/1",
+    "release": "r1",
+    "scope": "synthetic-provider-and-object",
+    "service": "synthetic-retention-followup"
+  },
+  "expires_at": "2026-11-05T00:00:00Z",
+  "format": "evidect-retention-binding/0.1",
+  "input_raw_sha256": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+  "issued_at": "2026-10-30T23:59:59.999999Z",
+  "trust_raw_sha256": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+}
