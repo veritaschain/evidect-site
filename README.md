@@ -57,3 +57,9 @@ The [authorization experiment](examples/execution-authorization/README.md) separ
 node --test examples/execution-authorization/gate.test.mjs
 node examples/execution-authorization/demo.mjs
 ```
+
+## Related retention evidence experiment
+
+The [Japanese regulatory/control/evidence mapping, §8.4](docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md#retention-evidence-adapter) now links the separately versioned [VAP retention adapter at its reviewed source](https://github.com/veritaschain/vap-spec/blob/62d15f1b8d3c46a1704acb7c0d5631622e1a5608/experiments/incident-retention-adapter/README.md). That offline experiment keeps attributed processing conditions, stated deadlines and scoped deletion evidence separate. It preserves the original erasure assessment and never turns elapsed time into completion evidence. The mapping identifies its recorded tests and the remaining provider, trust and operational integration conditions.
+
+The adapter resides in the VAP repository; this site does not invoke it or include it in the observation walkthrough. Its evidence and follow-up results are not automatically converted into EVIDECT control PASS/FAIL, legal compliance or certification decisions.
