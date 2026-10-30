@@ -1,0 +1,103 @@
+{
+  "erasure": {
+    "as_of": "2026-10-30T23:59:59.999999Z",
+    "evaluation_id": "retention-evaluation-synthetic",
+    "format": "incident-evidence-input/0.1",
+    "records": [
+      {
+        "algorithm": "Ed25519",
+        "body": {
+          "binding": {
+            "account_id": "account-synthetic-a",
+            "object_ids": [
+              "object-synthetic-v1"
+            ],
+            "payload_sha256": "2e92384fb162c6201807c7b0419bca9e7ed3fad8d02beec14235cf7915230bd4",
+            "provider_id": "provider-synthetic",
+            "request_id": "retention-request-synthetic",
+            "tenant_id": "tenant-synthetic-a"
+          },
+          "data": {
+            "requested_at": "2026-10-01T00:00:00Z",
+            "requested_locations": [
+              "active",
+              "provider-log",
+              "backup"
+            ]
+          },
+          "evaluation_id": "retention-evaluation-synthetic",
+          "issuer": "responder-synthetic",
+          "kind": "erasure.request",
+          "record_id": "request-record-synthetic",
+          "recorded_at": "2026-10-01T00:00:00Z"
+        },
+        "key_id": "responder-fresh-key",
+        "signature": "096dcba3001fe5b168afc33d1aa233724ba2cea2d1e54ba27068c1f3e47982a042d16f96cb119d0f5fb11470a7cb8a9b06f93d2a5c1adb66e73ed7490ef4250f"
+      }
+    ],
+    "target": {
+      "authorities": {
+        "collector": "collector-synthetic",
+        "provider": "provider-synthetic",
+        "responder": "responder-synthetic",
+        "reviewer": "reviewer-synthetic"
+      },
+      "coverage_requested": "managed_route",
+      "operation_at": "2026-10-01T00:00:00Z",
+      "subject": {
+        "account_id": "account-synthetic-a",
+        "object_ids": [
+          "object-synthetic-v1"
+        ],
+        "payload_sha256": "2e92384fb162c6201807c7b0419bca9e7ed3fad8d02beec14235cf7915230bd4",
+        "provider_id": "provider-synthetic",
+        "request_id": "retention-request-synthetic",
+        "tenant_id": "tenant-synthetic-a"
+      }
+    },
+    "workflow": "erasure"
+  },
+  "format": "retention-evidence-input/0.1",
+  "retention_records": [
+    {
+      "algorithm": "Ed25519",
+      "body": {
+        "binding": {
+          "account_id": "account-synthetic-a",
+          "object_ids": [
+            "object-synthetic-v1"
+          ],
+          "payload_sha256": "2e92384fb162c6201807c7b0419bca9e7ed3fad8d02beec14235cf7915230bd4",
+          "provider_id": "provider-synthetic",
+          "request_id": "retention-request-synthetic",
+          "tenant_id": "tenant-synthetic-a"
+        },
+        "data": {
+          "exceptions": [],
+          "locations": [
+            "active",
+            "provider-log"
+          ],
+          "processing_locations": [
+            "JP"
+          ],
+          "request_record_id": "request-record-synthetic",
+          "schedule": {
+            "deadline": "2026-10-31T00:00:00Z",
+            "kind": "stated-deadline"
+          },
+          "terms_ref": "https://provider.example.invalid/terms/synthetic-v1",
+          "terms_sha256": "328522f5f1444cd04dbbf5e1f9497a900f5608a19cc435009a0d675a2597f01b",
+          "training_use": "reported-disabled"
+        },
+        "evaluation_id": "retention-evaluation-synthetic",
+        "issuer": "provider-synthetic",
+        "kind": "retention.statement",
+        "record_id": "retention.statement-1",
+        "recorded_at": "2026-10-01T01:00:00Z"
+      },
+      "key_id": "provider-fresh-key",
+      "signature": "3716a5feec32a7c8108210fc10df97d52423ddd349af9d48e5b68bed7d57146e63ad20296fefbe27b5f5c250377c93e8914e445042392f34919cf9666efe6f01"
+    }
+  ]
+}
