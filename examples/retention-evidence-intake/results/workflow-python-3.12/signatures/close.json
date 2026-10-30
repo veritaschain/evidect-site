@@ -1,0 +1,7 @@
+{
+  "algorithm": "Ed25519",
+  "decision_raw_sha256": "977e962f10927e3646899064e87f579e3e84337b9a9509d10b8da0cde4384679",
+  "format": "evidect-retention-review-signature/0.1",
+  "key_id": "3c0f088091c84914a73eb567054e2180fbfa6854d984d06717075681e3a06897",
+  "signature": "12429ae2a9790e9356e5e8153761d587d0bcf4572865d0f10ba8fb2e6172d600caa20c05cbb06b31ee209fd1c0a5b7f532dfd62bded2ee424ca2df5975e1d508"
+}

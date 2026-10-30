@@ -4,6 +4,12 @@ This is a separate **internal, synthetic, offline** capture for the receiver
 [follow-up extension](../FOLLOWUP.md). It does not replace the original
 [PR24 intake capture](README.md) or make that earlier capture cover new code.
 
+This is the historical capture included in [PR25][pr25], fixed to EVIDECT
+source commit [`054d97a78c220fd2f57b8754eeccbceebf95cfb7`][source]. Its
+**39 tests, four frames and four saved-input rechecks** describe that version.
+Later signed-decision and operator-workflow code is recorded separately in
+[WORKFLOW.md](WORKFLOW.md). The original capture files and hashes are unchanged.
+
 ## Local execution
 
 | Item | Recorded value |
@@ -70,8 +76,11 @@ EVIDECT_VAP_SOURCE=/absolute/path/to/vap-retention-source \
 
 ## Re-evaluate the saved repaired-input case
 
-Prepare the source and dependencies using the [example README](../README.md).
-From the example directory, choose the original files and assignment explicitly:
+Use a separate checkout at the [fixed PR25 source][source], then prepare the
+dependencies using that version's [example README][source-readme]. Its 19
+source-file hashes identify that implementation, rather than a later checkout.
+From the fixed version's example directory, choose the original files and
+assignment explicitly:
 
 ```sh
 .venv/bin/python -I -B followup.py \
@@ -95,7 +104,7 @@ The output must be new. The receiver must select and protect its trust,
 assignment and current-state assumptions separately from received evidence;
 the demo's co-located files do not establish that operational separation.
 
-[followup_demo.py](../followup_demo.py) saves each assignment and original input
+[The PR25 follow-up demo][source-demo] saves each assignment and original input
 group, reads those saved files again and compares the entire re-evaluated
 report. It separately compares every embedded intake report with direct
 recomputation. The source manifest fixes the files used for this capture; its
@@ -105,3 +114,8 @@ GitHub Actions produces separate outputs. Its actual runs and retained
 artifacts establish CI results; workflow configuration or this local capture
 does not. None of these internal executions constitutes a human review,
 provider deletion, production control, certification or independent reproduction.
+
+[pr25]: https://github.com/veritaschain/evidect-site/pull/25
+[source]: https://github.com/veritaschain/evidect-site/tree/054d97a78c220fd2f57b8754eeccbceebf95cfb7
+[source-readme]: https://github.com/veritaschain/evidect-site/blob/054d97a78c220fd2f57b8754eeccbceebf95cfb7/examples/retention-evidence-intake/README.md
+[source-demo]: https://github.com/veritaschain/evidect-site/blob/054d97a78c220fd2f57b8754eeccbceebf95cfb7/examples/retention-evidence-intake/followup_demo.py

@@ -11,6 +11,7 @@ from test_site import Page, ROOT
 
 ORIGIN = 'https://evidect.veritaschain.org'
 CONFIG = json.loads((ROOT / 'seo.json').read_text())
+OFFLINE_REPORTS = set(ROOT.glob('examples/retention-evidence-intake/results/*/cases/*/case.html'))
 
 
 class SEOTests(unittest.TestCase):
@@ -67,12 +68,36 @@ class SEOTests(unittest.TestCase):
         self.assertEqual(struct.unpack('<HHH', icon[:6]), (0, 1, 3))
         self.assertEqual({icon[6+i*16] for i in range(3)}, {16, 32, 48})
         for file in ROOT.rglob('*.html'):
+            if file in OFFLINE_REPORTS:
+                # These are self-contained saved evidence views, checked below.
+                # Site-relative icons would introduce an offline dependency.
+                continue
             text = file.read_text()
             self.assertIn('href="/favicon-96x96.png"', text, file)
             self.assertIn('href="/apple-touch-icon.png"', text, file)
         manifest = json.loads((ROOT / 'site.webmanifest').read_text())
         for image in manifest['icons']:
             self.assertTrue((ROOT / image['src'].lstrip('/')).is_file())
+
+    def test_offline_reports_remain_inert_and_nonindexable(self):
+        self.assertTrue(OFFLINE_REPORTS)
+        for file in sorted(OFFLINE_REPORTS):
+            with self.subTest(file=file.relative_to(ROOT)):
+                nodes = Page(file.read_text()).nodes
+                meta = [attrs for tag, attrs in nodes if tag == 'meta']
+                self.assertEqual([a.get('content') for a in meta if a.get('name') == 'robots'],
+                                 ['noindex,nofollow'])
+                self.assertEqual([a.get('content') for a in meta if a.get('name') == 'referrer'],
+                                 ['no-referrer'])
+                self.assertEqual([a.get('content') for a in meta
+                                  if a.get('http-equiv', '').lower() == 'content-security-policy'],
+                                 ["default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"])
+                self.assertFalse(any(a.get('http-equiv', '').lower() == 'refresh' for a in meta))
+                for tag, attrs in nodes:
+                    self.assertNotIn(tag, {'script', 'form', 'iframe', 'frame', 'object', 'embed', 'base'})
+                    self.assertFalse(set(attrs) & {'href', 'src', 'srcset', 'srcdoc', 'imagesrcset', 'action',
+                                                   'formaction', 'poster', 'data', 'background'})
+                    self.assertFalse(any(name.startswith('on') for name in attrs))
 
     def test_sitemap_and_reciprocal_languages(self):
         tree = ET.parse(ROOT / 'sitemap.xml')

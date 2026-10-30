@@ -3,12 +3,16 @@ on:
   pull_request:
     paths:
       - 'examples/control-revalidation/**'
+      - 'examples/retention-evidence-intake/**'
+      - 'tests/**'
       - 'docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md'
       - '.github/workflows/control-revalidation.yml'
   push:
     branches: [main]
     paths:
       - 'examples/control-revalidation/**'
+      - 'examples/retention-evidence-intake/**'
+      - 'tests/**'
       - 'docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md'
       - '.github/workflows/control-revalidation.yml'
   workflow_dispatch:

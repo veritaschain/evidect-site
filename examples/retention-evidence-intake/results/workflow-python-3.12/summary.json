@@ -1,0 +1,365 @@
+{
+  "case_count": 12,
+  "cases": {
+    "RW-01-open": {
+      "expected_work_state": "OPEN",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "OPEN"
+      }
+    },
+    "RW-02-closed": {
+      "expected_work_state": "CLOSED_REVIEW",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "CLOSED_REVIEW"
+      }
+    },
+    "RW-03-keep-open": {
+      "expected_work_state": "OPEN",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "OPEN"
+      }
+    },
+    "RW-04-old-close-replay": {
+      "expected_work_state": "UNASSESSABLE",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "UNASSESSABLE"
+      }
+    },
+    "RW-05-altered-decision": {
+      "expected_work_state": "UNASSESSABLE",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "UNASSESSABLE"
+      }
+    },
+    "RW-06-missing-trust": {
+      "expected_work_state": "UNASSESSABLE",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "UNASSESSABLE"
+      }
+    },
+    "RW-07-missing-checkpoint": {
+      "expected_work_state": "UNASSESSABLE",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "UNASSESSABLE"
+      }
+    },
+    "RW-08-revoked-key": {
+      "expected_work_state": "REOPEN_REQUIRED",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "REOPEN_REQUIRED"
+      }
+    },
+    "RW-09-new-context": {
+      "expected_work_state": "REOPEN_REQUIRED",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "REOPEN_REQUIRED"
+      }
+    },
+    "RW-10-deadline-crossed": {
+      "expected_work_state": "REOPEN_REQUIRED",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "REOPEN_REQUIRED"
+      }
+    },
+    "RW-11-decision-expired": {
+      "expected_work_state": "REOPEN_REQUIRED",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "REOPEN_REQUIRED"
+      }
+    },
+    "RW-12-assignment-changed": {
+      "expected_work_state": "REOPEN_REQUIRED",
+      "observed": {
+        "control_status": "UNASSESSABLE",
+        "latest_evidence": "VALID",
+        "legal_compliance": "NOT_ASSESSED",
+        "notification_sent": false,
+        "production_observed": false,
+        "work_state": "REOPEN_REQUIRED"
+      }
+    }
+  },
+  "created_at": "2026-10-30T23:08:49.710067+00:00",
+  "files": {
+    "cases/RW-01-open/case.html": "70be98398c3de56b57dae076b10e2c1dbcd6c23aaf21924c7526fd5b7b1ecbf6",
+    "cases/RW-01-open/case.json": "3a99f7097f44c8054537cf4e47527351b04c1a3fe09d9520dbe9491aa114cd6a",
+    "cases/RW-01-open/case.md": "4a077c122721788cb4fc996ea5bc48e966b30f73bbe5da5d2c0249f538d9a0c6",
+    "cases/RW-02-closed/case.html": "08577caa9466c12a1ca6b246782ff71a82f68515776cdf52de49cd7793d11272",
+    "cases/RW-02-closed/case.json": "c71231b271c9dcaaa975d7cb30be2a07f64f5e0814085bb8563c67557557a530",
+    "cases/RW-02-closed/case.md": "c16bfce94197d0c47a1678d2573f805c8afc41e2c153030232eb9332ea302352",
+    "cases/RW-03-keep-open/case.html": "acb73a1dedee7c66ac0db6c9929c923d0a0140c0f020a5ac20a56fd4dd9ca027",
+    "cases/RW-03-keep-open/case.json": "b28501cd3043dca94f5fb394657ee2ccd759caa55be87e493ba4ae1abcc09b2d",
+    "cases/RW-03-keep-open/case.md": "cdc94f6093a6c8e760d221feac0dbe6fe2a394f57232140993a556332541537e",
+    "cases/RW-04-old-close-replay/case.html": "d2c21a618b5591b65273773c05936f9ce1e69e8dd2cfb59578cc2f3f27657e9d",
+    "cases/RW-04-old-close-replay/case.json": "54bc058cdc5fdf37b2290a725f111353d55d813f360dd053a2bc43d64736ea67",
+    "cases/RW-04-old-close-replay/case.md": "f690763aaeda8d70a0e355621c33b3f0ff616f68afa2419087f141b5a51a0bf6",
+    "cases/RW-05-altered-decision/case.html": "04112b5a37b1ea891dcb6885721559d927fab1a29400e2656e685ff382b8c492",
+    "cases/RW-05-altered-decision/case.json": "2248b2d18cb2a9579f110f9c2eea3e833976707c1ae5d1df39ca6fdd139bc3b5",
+    "cases/RW-05-altered-decision/case.md": "80c54bdb969f09d2071ea2044b404e107825121bd87f79d6c16acbbd1376bfdd",
+    "cases/RW-06-missing-trust/case.html": "4cee9ed95cd809a521653bcf105e2d5e1c10ad6659f7d433eff16812477721d6",
+    "cases/RW-06-missing-trust/case.json": "ca7d60484373ad2c1e0f55b113228544b041e58c893e6ca29f3b404795b411c3",
+    "cases/RW-06-missing-trust/case.md": "cbb0ae3b10c99b02e16d3bc7e7981c0d9b8c8af72b4f97713fbebf1e4abf5dc8",
+    "cases/RW-07-missing-checkpoint/case.html": "74dd05c6b85ee3d34fedcafe9de69a32e4517bc08b33dbc91045105315991c0c",
+    "cases/RW-07-missing-checkpoint/case.json": "3dfa6d0830434689833262db95b7a001e9ec5b11a22130206d071fca892aa9d9",
+    "cases/RW-07-missing-checkpoint/case.md": "e3a314869d7fcd25938f958c9fb87eed23135bcc36f571ba621dc9265c2c9c2e",
+    "cases/RW-08-revoked-key/case.html": "57639afab671df6d838e71140a322d7ebd34c452a2e93ea5fdb53cfd97f1805b",
+    "cases/RW-08-revoked-key/case.json": "6101f5ad133d2a3237b7ccae2e6db9d1d9c648e11b5c9dc6b3261002547e5ca4",
+    "cases/RW-08-revoked-key/case.md": "38ef381303642c2983906e6281fdd3d52178416c21218bd2ba7bc232c4af1b73",
+    "cases/RW-09-new-context/case.html": "7eeb6ab36f997e18c710feefe1cb4aaba32338b85bee2ae8a80553e7cb970b33",
+    "cases/RW-09-new-context/case.json": "162a2b8f1b99fa76753e81617f5e3b6400bf50bc0806aa9e019cd7e1f783c433",
+    "cases/RW-09-new-context/case.md": "7ce58eccb0f6f752c4da0e0c2342398ee406df267ce122bc3f0a60832d266d47",
+    "cases/RW-10-deadline-crossed/case.html": "1a637eca378c75853c711a8563f620a3e5c46adfa0cc5bd6837687f06562b45c",
+    "cases/RW-10-deadline-crossed/case.json": "1c3bcad89ec5b956456784fc5d6bd020286b395e57d734f1040866bfcbce1235",
+    "cases/RW-10-deadline-crossed/case.md": "c6ed24d1914424f3fafb7984d5e759b8dc2a66e0589421d904b079263b8a6a03",
+    "cases/RW-11-decision-expired/case.html": "03234a3c047ddcdb9f6e7f91c5143123e287fb9b5ab27c6398d8adc91c7441ee",
+    "cases/RW-11-decision-expired/case.json": "1a965d11e23fcfe9d598869f50a2edadc2e660b2e53c031233ead6f7599f1dad",
+    "cases/RW-11-decision-expired/case.md": "cb7a773d474c05082f662933201f0b171fcf3e6166f757708a8aa80fa4960a9f",
+    "cases/RW-12-assignment-changed/case.html": "e6240e51414c116744a339a687e29a9550c0697b8a8b2c6e6f1b8736f32c69ac",
+    "cases/RW-12-assignment-changed/case.json": "6fb6723b78c1d98f638f05e1ef2516f4b473537ed7e1c672778d534a283e4efe",
+    "cases/RW-12-assignment-changed/case.md": "67e8fa074135e9612d79b270798e723aea2f4dbc6cfd33cd8853e2e23406f613",
+    "changed-assignment.json": "7a931e31033d5a86f5e90b178fb921292593b1ed531be2b9002e2094e6fe815f",
+    "checkpoints/close.json": "c3b5fe5279c0677b31e2d6fcc818f180a0b219afdc034a77d2f6418d7d614be1",
+    "checkpoints/keep-open.json": "3a5feb9b6a201668c893c0a72e842374385b12fdc5b2237b346457977e2e7d4e",
+    "currents/changed.json": "79786275988615d0420e55409b32b930905259279c6bb65444822dd411ae28c4",
+    "currents/deadline.json": "945d43d4c0580ea2ce2b386913093d0a9afff1d8fc0a8f94302318bc577d13bc",
+    "currents/expired.json": "2958ad7a2086997983a891d1078dafd7ab1ed29e7dbdabd302fa3898d9320712",
+    "currents/review.json": "dfc9c9c51d3494945fec7a5068752ff50960cd1cbdb46e9cfd50d0f3b1ea073d",
+    "decisions/altered.json": "c6541df69023c2c75580484331d3f89ad10284c419ec5c0fd91d518c0e036293",
+    "decisions/close.json": "977e962f10927e3646899064e87f579e3e84337b9a9509d10b8da0cde4384679",
+    "decisions/keep-open.json": "076a04807b759f17dc2d2bb24e1397a5e0d1712bdfe780a3ab50aec560b9f7ea",
+    "draft.json": "a4c574922a3af25f3605425091ffa26542ab83fc58e23a39c06b717c249f1183",
+    "policies/reviewers.json": "57924f3c9f529415d8052ac5184f2d672dce7de5afd97ef21ea31fa03e104fc9",
+    "policies/revoked.json": "279482f0abc3b61ce0228c481c3641598c8799fe8bb69b75be1d0a15514570a5",
+    "prepared/assignment.json": "587b76a72ee050e1c5b60ccc219689a775190e3caa5a0b76e793464dc513cc44",
+    "prepared/followup.json": "098d28308d9cf4e22ffbb03d7719465aa9791f063792f553ff0646ae2e61bab9",
+    "signatures/close.json": "24e648d192a5224d8f333e92c4e59e859707714e4ae636d3a5e21fe31979fca1",
+    "signatures/keep-open.json": "cbf9a58ebd7acfa57277327f2ab12fee519ab3909b3a57ef8ed75dace88aff83",
+    "snapshots/01-origin/binding.json": "35f965a2dbc08c307e9aaf3b89ceba2b18629509dca23958bb4c9eb0fa5060fe",
+    "snapshots/01-origin/current.json": "dfc9c9c51d3494945fec7a5068752ff50960cd1cbdb46e9cfd50d0f3b1ea073d",
+    "snapshots/01-origin/input.json": "2da351fbd359aa853346aabe95b20c15592b78ba71d42facf66c8edaf13a4cd5",
+    "snapshots/01-origin/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715",
+    "snapshots/02-corrected/binding.json": "c2692790d135f3f028da312393020574873d26f2a21e7046bec4314da3dba712",
+    "snapshots/02-corrected/current.json": "dfc9c9c51d3494945fec7a5068752ff50960cd1cbdb46e9cfd50d0f3b1ea073d",
+    "snapshots/02-corrected/input.json": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+    "snapshots/02-corrected/trust.json": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+  },
+  "format": "evidect-retention-workflow-demo/0.1",
+  "historical_dossier_preserved": true,
+  "limitations": "One synthetic controller selected evidence, reviewer trust and current checkpoints and authored the test decisions. No real reviewer identity, production control, provider deletion, notification or independent reproduction is established.",
+  "matched": 12,
+  "private_keys_exported": false,
+  "python_version": "3.12.14",
+  "recheck": {
+    "file_hashes_verified": 61,
+    "rechecked": 12,
+    "source_files": 28
+  },
+  "source_manifest": {
+    ".github/workflows/retention-evidence-intake.yml": "35ffb89ebb59e76b64493563f5d10976f190b233f44b1fe6a24d59318b34972a",
+    "examples/retention-evidence-intake/CONTRACT.md": "af178431ca54e345c7aaa1b0d1a8dd7a6953c3bb53bd2786d2cec4c9ed4b2a52",
+    "examples/retention-evidence-intake/DECISION_CONTRACT.md": "dc283db93edb915d21c11e5b4a99d04964554da95f42cbc4f16fee16fa639cf2",
+    "examples/retention-evidence-intake/FOLLOWUP.md": "792dfcb976a26b3c6a02c80f4d8e96a27a86df975178002624a2a3dc76e309a9",
+    "examples/retention-evidence-intake/OPERATOR_GUIDE.md": "0d61a14d1bacac6205a91921deff4692c3c65a6f25626c5bb47c9f41bcddac38",
+    "examples/retention-evidence-intake/casework.py": "3f4be6187202bf2ac8454125429f715065022a74302baaf2450593d88be419d6",
+    "examples/retention-evidence-intake/demo.py": "48aef687c06778915ed4c8a5dfda125007f9e96016400977f6e1d3fa668d7742",
+    "examples/retention-evidence-intake/followup.py": "fa28931a0a5990a8606a70d9d7400e0443a8ea5f531e3d0fb91afd786eee90c3",
+    "examples/retention-evidence-intake/followup_demo.py": "8acbaaffe1e3150bb3910d06baf2700538d1c2ca7d560cbeac24a67617167851",
+    "examples/retention-evidence-intake/intake.py": "807c809dc5da6082f4eff344b3995cdd5bb6b2812a40786d4bd5090bb74d846a",
+    "examples/retention-evidence-intake/requirements.txt": "4e8db0811dba93c1aee12da58f14aa31f96051d04783f156ea8fb15391f821d6",
+    "examples/retention-evidence-intake/retention_intake/__init__.py": "54c41c58686f7fc42ced7b409af861b0b423a12b86e3b924e1930f1218cef339",
+    "examples/retention-evidence-intake/retention_intake/__main__.py": "ceeada83e9c5669c23f9210d719e81ae1102cced69407fa3bbbac3d99108370c",
+    "examples/retention-evidence-intake/retention_intake/core.py": "741feeb12b036d27d8ab08f82f8c7eeccf6dbd36076d0a9915b31e8ec8818b5e",
+    "examples/retention-evidence-intake/retention_intake/decision.py": "6c4f2a780aa6913c9e8d443ef1685cb6ad833fbf659daa8915a6013ccab23a24",
+    "examples/retention-evidence-intake/retention_intake/followup.py": "c1e09c83967fcaa7acac84160492d3bcd7707033d1d91b4d5e92c1474a630ed4",
+    "examples/retention-evidence-intake/retention_intake/model.py": "b400074e007a2c213f68f4d0b57241d2177046db252c45b3f5fa9a5c83cc523c",
+    "examples/retention-evidence-intake/retention_intake/presentation.py": "a2b9e4ac5c372bc38da41091321fd8bf1aa0993b715a14edc29591d9bab1e09e",
+    "examples/retention-evidence-intake/retention_intake/source.py": "9683692cea656e067c6488fb05bf9cd4ae952f63a12b20c26c5dc222d9a11f02",
+    "examples/retention-evidence-intake/retention_intake/worker.py": "fd2a185a223144fc57b2ea8b07b098dd295d661ea0a2b94a8745bf42758ae2cc",
+    "examples/retention-evidence-intake/retention_intake/workflow_io.py": "6be8617b83988c2524b99281e6b675d4b9f138c32935fb554aa536e7f6592658",
+    "examples/retention-evidence-intake/test_support.py": "7b414dd4e0d94523e76e88e2fff5fe91991863ab470f2e8bd0c615a8611987c8",
+    "examples/retention-evidence-intake/tests/test_decision.py": "353d02d4a4ac505fd9e1e1e2a29ac9bf68fbac1798f90d37d1db5847d297c817",
+    "examples/retention-evidence-intake/tests/test_followup.py": "320ba1948cee180fbfbad9424074d313f6c3361cad64695f94344fbaf9f75d51",
+    "examples/retention-evidence-intake/tests/test_intake.py": "19184b5fbb15fafb55d01acc7ab787d7c4621f5c9b617094a89ef1a8cc39ab00",
+    "examples/retention-evidence-intake/tests/test_workflow.py": "0760a7628834627cef505586fb642b663d003bf5c58738ba864d98311bc4eb56",
+    "examples/retention-evidence-intake/upstream-pin.json": "22ca2ba7dcbb1996e746b593be0737e8a837ac54f79c35b5ab856a44fa84254a",
+    "examples/retention-evidence-intake/workflow_demo.py": "8ec126c1231a2f98c5a76cbd009039d35759b5aead732d3a72f2c52277135a20"
+  },
+  "stages": [
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "prepare-selected-inputs",
+      "status": "ASSIGNMENT_PREPARED_REVIEW_NOT_COMPLETED"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "prepare-incomplete-decision",
+      "status": "DRAFT_REQUIRES_EXPLICIT_REVIEW"
+    },
+    {
+      "exit_code": 2,
+      "expected_exit_matched": true,
+      "stage": "refuse-incomplete-decision",
+      "status": "EXPECTED_REJECTION"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "sign-close",
+      "status": "DECISION_SIGNED_NOT_A_CONTROL_APPROVAL"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "select-close",
+      "status": "RECEIVER_SELECTED_CURRENT_DECISION"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "sign-keep-open",
+      "status": "DECISION_SIGNED_NOT_A_CONTROL_APPROVAL"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "select-keep-open",
+      "status": "RECEIVER_SELECTED_CURRENT_DECISION"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-01-open",
+      "status": "OPEN"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-02-closed",
+      "status": "CLOSED_REVIEW"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-03-keep-open",
+      "status": "OPEN"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-04-old-close-replay",
+      "status": "UNASSESSABLE"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-05-altered-decision",
+      "status": "UNASSESSABLE"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-06-missing-trust",
+      "status": "UNASSESSABLE"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-07-missing-checkpoint",
+      "status": "UNASSESSABLE"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-08-revoked-key",
+      "status": "REOPEN_REQUIRED"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-09-new-context",
+      "status": "REOPEN_REQUIRED"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-10-deadline-crossed",
+      "status": "REOPEN_REQUIRED"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-11-decision-expired",
+      "status": "REOPEN_REQUIRED"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_matched": true,
+      "stage": "RW-12-assignment-changed",
+      "status": "REOPEN_REQUIRED"
+    },
+    {
+      "exit_code": 2,
+      "expected_exit_matched": true,
+      "stage": "refuse-existing-case-output",
+      "status": "EXPECTED_REJECTION"
+    }
+  ],
+  "upstream_commit": "62d15f1b8d3c46a1704acb7c0d5631622e1a5608"
+}

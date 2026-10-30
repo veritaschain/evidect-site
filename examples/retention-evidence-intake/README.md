@@ -16,6 +16,10 @@ The receiver's generated report is unsigned. Checking a transported result
 requires the original inputs and separately selected receiver assumptions;
 the output is not a new authenticated receipt or external timestamp.
 
+For the complete operator path, start with the Japanese
+[review workflow guide](OPERATOR_GUIDE.md). It adds a separately signed work
+decision while preserving the original unsigned intake and follow-up reports.
+
 ## Four separate inputs
 
 | Input | Purpose |
@@ -185,6 +189,59 @@ follow-up frames and recheck their saved inputs:
 Use a new output directory. See [FOLLOWUP.md](FOLLOWUP.md) for the assignment
 contract, explicit input selection, history boundaries and expected state
 meanings. Consult the actual execution summary and CI run for achieved counts.
+
+## Record a decision and re-evaluate its current applicability
+
+The [decision contract](DECISION_CONTRACT.md) adds explicit reviewer
+dispositions for every historical review item and requested evidence. The
+operator edits an intentionally incomplete draft, signs its exact bytes with
+an Ed25519 reviewer key, and separately selects the currently adopted decision
+by its raw hash. Signature validity, reviewer authority, evidence suitability
+and the receiver's current selection are separate checks.
+
+The `casework.py` commands are `prepare`, `draft`, `sign`, `select` and `verify`.
+The [operator guide](OPERATOR_GUIDE.md) supplies complete examples and explains
+how to renew the selected snapshots and assignment when a new time boundary
+requires review. Verification recomputes the original dossier and produces a
+new `case.json`, Japanese `case.html` and `case.md` in a new directory.
+
+| Work state | Meaning under the explicitly selected inputs |
+| --- | --- |
+| `OPEN` | No closing decision is selected, or the selected valid action keeps the review open |
+| `CLOSED_REVIEW` | The selected closing decision satisfies this experiment's signature, authority, coverage and current-applicability checks |
+| `REOPEN_REQUIRED` | An authentic closing decision needs renewed review after evidence, assignment, policy, context or time changes |
+| `UNASSESSABLE` | The decision cannot be used because a necessary check is missing, inconsistent or invalid |
+
+The original dossier's `case_status` stays `OPEN`; the separate work state
+records the applicability of a reviewer decision. Neither state proves
+deletion, a passing control or legal compliance. Receiver policy, current
+checkpoint, selected history and current clock remain caller-protected inputs.
+The checkpoint prevents an old decision being accepted only relative to the
+selected checkpoint; it does not authenticate a complete case history.
+
+To execute all five commands, save public synthetic inputs and outputs, and
+re-evaluate the saved reports after discarding the temporary reviewer private key:
+
+```sh
+.venv/bin/python -I -B workflow_demo.py \
+  --vap-source /absolute/path/to/vap-retention-source \
+  --output generated-workflow
+```
+
+The walkthrough creates a fresh test key; it does not enroll a real reviewer
+or establish a human decision. A later invocation can recheck the same saved
+conditions using only the public verification material:
+
+```sh
+.venv/bin/python -I -B workflow_demo.py \
+  --vap-source /absolute/path/to/vap-retention-source \
+  --recheck generated-workflow
+```
+
+This saved-condition recheck does not acquire a later clock, key revocation or
+provider observation. Use `casework.py verify` with separately supplied current
+inputs to assess those changes. See the [recorded execution](results/WORKFLOW.md)
+for actual case counts, hashes, source inventory and reproduction boundaries.
 
 ## Source isolation and limits
 

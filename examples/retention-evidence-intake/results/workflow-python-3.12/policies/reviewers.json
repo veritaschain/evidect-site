@@ -1,0 +1,23 @@
+{
+  "case_id": "synthetic-review-workflow",
+  "environment": "synthetic",
+  "format": "evidect-retention-review-trust/0.1",
+  "keys": [
+    {
+      "key_id": "3c0f088091c84914a73eb567054e2180fbfa6854d984d06717075681e3a06897",
+      "not_after": "2026-11-04T00:00:00Z",
+      "not_before": "2026-10-30T00:00:00Z",
+      "public_key_hex": "cd78ebb117078fb9937c77dcc96d6b679bb61c99f510d0953acfdbbab7faf066",
+      "reviewer_ref": "synthetic-reviewer",
+      "revoked_at": null,
+      "roles": [
+        "review"
+      ]
+    }
+  ],
+  "mode": "synthetic-test-only",
+  "policy_id": "synthetic-review-policy/1",
+  "scope": "synthetic-provider-and-object",
+  "service": "synthetic-retention-followup",
+  "target_sha256": "5c19a93892baf41d9127f0da0648779f22d5409caf245ca98da14eabf40319e1"
+}
