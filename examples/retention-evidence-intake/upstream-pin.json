@@ -1,0 +1,35 @@
+{
+  "commit": "62d15f1b8d3c46a1704acb7c0d5631622e1a5608",
+  "dependencies": {
+    "cffi": "2.1.1",
+    "cryptography": "50.0.2",
+    "pycparser": "3.12",
+    "rfc8785": "0.1.4"
+  },
+  "files": {
+    ".github/workflows/incident-retention-adapter.yml": "fa8db769c7d1bed62e2f3028432cddcaa4b5b8179fdee3b1a6bba34521fe11d7",
+    "experiments/incident-evidence-assessor/incident_assessor/__init__.py": "24ef8b3d35cb02bc85303fc6932a7d9af438c878fd6da427d38c8df295acec72",
+    "experiments/incident-evidence-assessor/incident_assessor/__main__.py": "2add1793b9a1c6db77fab17e592ded6ad44ba230c036e528e6d1b1356422ef7e",
+    "experiments/incident-evidence-assessor/incident_assessor/assess.py": "3e2890d7b6c417e4c10f4c57473de79f5f5b9fb410fcc61b0be905a6bedc8dc0",
+    "experiments/incident-evidence-assessor/incident_assessor/cross_party.py": "f7922f8b457efddb5df13efcbd7095ff81c5c63b429e9d6dbe21636342c479b3",
+    "experiments/incident-evidence-assessor/incident_assessor/erasure.py": "953f1772210059ffe9a7a39f6f00d8bf709c063020e9aa200d4610b9297d0281",
+    "experiments/incident-evidence-assessor/incident_assessor/evidence.py": "a129a6b17a58993d454efae188f16ae5ec24b95fd8335fcb9d63c2e10ce7494c",
+    "experiments/incident-evidence-assessor/incident_assessor/incident_response.py": "c4032159f6d2642307e6eee5b2c570454a7d3ad34eb1259c3f11a8abe8140717",
+    "experiments/incident-evidence-assessor/incident_assessor/model.py": "0a6c26c54d9209874941fadbdc02b5e524deeebf24c9d3cedf5ad99e0be76769",
+    "experiments/incident-evidence-assessor/incident_assessor/publication.py": "af246df6686402de4288f49ec8bc4c228a04c1ee915a2e108338eebbdd55ba99",
+    "experiments/incident-evidence-assessor/incident_assessor/transfer.py": "3f3888cb6797eec5d82bfebd87626cbb20fee5960a16f3ea62477dc3e3f018a8",
+    "experiments/incident-evidence-assessor/requirements.txt": "4e8db0811dba93c1aee12da58f14aa31f96051d04783f156ea8fb15391f821d6",
+    "experiments/incident-retention-adapter/CONTRACT.md": "92b8c222fec00c66f88147b0e1258c6cc7efe5efa5bd2bb20f1d37c4c8380611",
+    "experiments/incident-retention-adapter/fixture_support.py": "70b291ff2ccf15e5a226d1816234b7a74399fd0cc8c35f7494b388aa24e7a25d",
+    "experiments/incident-retention-adapter/requirements.txt": "7f68b28a497f02318887f5fb6bc4bfbbc7a73ae7ca290e21e2af28d5a0842299",
+    "experiments/incident-retention-adapter/retention_adapter/__init__.py": "4716e05272ddccbf7965ce0386e9136d4c30026ac5ad83bd5f65b08f05f99f2c",
+    "experiments/incident-retention-adapter/retention_adapter/__main__.py": "3e86ead2ba701e70d1169927d90d740711f764e39330a48d84fe3cf934b0942b",
+    "experiments/incident-retention-adapter/retention_adapter/core.py": "67128844e2f6090e7dfe3805aef9f944276eab0812c084f051610e59dc9dc587",
+    "experiments/incident-retention-adapter/suite.py": "74a692d1895c09eb317342680198d00672c2f4103090dd26009888465e11dc2c",
+    "experiments/incident-retention-adapter/tests/test_adapter.py": "9c724b32a58b122aec488896ac4a124dc13700aa3170594d98ff5feaf340c363",
+    "experiments/incident-retention-adapter/tests/test_cli.py": "20307a6d9a664abe36d2e74c0f18610e8b3e2f01d6156e956e3123b25c596022",
+    "experiments/incident-retention-adapter/tests/test_suite.py": "bbd85e3ebbbb0f35ccaed31b1f9e0628443bbd8a212ce2f13c360b06bf7dc511"
+  },
+  "format": "evidect-vap-source-pin/0.1",
+  "repository": "https://github.com/veritaschain/vap-spec"
+}

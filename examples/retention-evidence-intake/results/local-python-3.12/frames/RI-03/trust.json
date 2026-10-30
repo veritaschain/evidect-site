@@ -1,0 +1,53 @@
+{
+  "erasure_trust": {
+    "as_of": "2026-10-30T23:59:59.999999Z",
+    "evaluation_id": "retention-evaluation-synthetic",
+    "format": "incident-evidence-trust/0.1",
+    "keys": {
+      "collector-fresh-key": {
+        "issuer": "collector-synthetic",
+        "not_after": "2027-01-01T00:00:00Z",
+        "not_before": "2026-01-01T00:00:00Z",
+        "organization": "requester-organization",
+        "public_key": "33d1f1d534ec4ec0eb31b849cc0bed8c0de1846d408c30e5ca87dbf6299a05d9",
+        "roles": [
+          "collector"
+        ]
+      },
+      "provider-fresh-key": {
+        "issuer": "provider-synthetic",
+        "not_after": "2027-01-01T00:00:00Z",
+        "not_before": "2026-01-01T00:00:00Z",
+        "organization": "provider-organization",
+        "public_key": "a440cc8494719f531e6ca78693ea43a3fdfd5ae7a432e45f3c6a968c34b5db1e",
+        "roles": [
+          "provider"
+        ]
+      },
+      "responder-fresh-key": {
+        "issuer": "responder-synthetic",
+        "not_after": "2027-01-01T00:00:00Z",
+        "not_before": "2026-01-01T00:00:00Z",
+        "organization": "requester-organization",
+        "public_key": "dee0860beb52be354cab23e1559e144472d067f879f482facfcfa29dedfe1028",
+        "roles": [
+          "responder"
+        ]
+      },
+      "reviewer-fresh-key": {
+        "issuer": "reviewer-synthetic",
+        "not_after": "2027-01-01T00:00:00Z",
+        "not_before": "2026-01-01T00:00:00Z",
+        "organization": "reviewer-organization",
+        "public_key": "cb5b9caac54cffc02959c45c064f149ce1a7121efbc1becf10ca85811f57168b",
+        "roles": [
+          "reviewer"
+        ]
+      }
+    },
+    "mode": "synthetic-test-only",
+    "target_sha256": "5c19a93892baf41d9127f0da0648779f22d5409caf245ca98da14eabf40319e1",
+    "workflow": "erasure"
+  },
+  "format": "retention-evidence-trust/0.1"
+}

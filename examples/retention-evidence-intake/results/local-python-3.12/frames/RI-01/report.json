@@ -1,0 +1,194 @@
+{
+  "bindings": {
+    "basis": "RECEIVER_SELECTED_MAPPING_NOT_PART_OF_PROVIDER_SIGNATURE",
+    "binding_id": "synthetic-receiver-choice-1",
+    "bound_context_sha256": "97cdaf3e9784912b82db459bc101843c6caee86bb82fffa82ff24f84b211f46f",
+    "current_context_sha256": "97cdaf3e9784912b82db459bc101843c6caee86bb82fffa82ff24f84b211f46f",
+    "current_record_sha256": "c47729d45d9a4564fc1c96c09f108ac5992c788592e5b922ebd73d7ff06c434a",
+    "input_raw_sha256": "d752b45d5e879bfb791a0f54d7f968c7520054ec6515ed6167af15f8864d43ea",
+    "receiver_binding_sha256": "4b0b4a7a2635fb89c9ea1c91a18218802210995c53c7f503e20f83d3f15eb978",
+    "trust_raw_sha256": "ba405fad15d2eb70dcaa356c8d1a9db0591f9b2afdb01fb1d7cb8b5a47264715"
+  },
+  "certification": "NOT_ASSESSED",
+  "control_reason": "NO_DIRECT_CONTROL_OBSERVATION_SUPPLIED",
+  "control_status": "UNASSESSABLE",
+  "criteria": "evidect-retention-intake-review/0.1",
+  "evidence": {
+    "external_anchor_status": "INDETERMINATE",
+    "local_status": "VALID",
+    "overall_status": "INDETERMINATE",
+    "reasons": [
+      "NO_EXTERNAL_ANCHOR",
+      "STATEMENTS_NOT_INDEPENDENTLY_OBSERVED"
+    ]
+  },
+  "follow_up_reasons": [],
+  "format": "evidect-retention-intake-report/0.1",
+  "freshness": {
+    "basis": "RECEIVER_SUPPLIED_CONTEXT_AND_CLOCK_NOT_INDEPENDENTLY_OBSERVED",
+    "checked_at": "2026-10-30T23:59:59.999999Z",
+    "context_state": "MATCH",
+    "deadline_boundaries_crossed": [],
+    "evidence_as_of": "2026-10-30T23:59:59.999999Z",
+    "exception_boundaries_crossed": [],
+    "expires_at": "2026-11-05T00:00:00Z",
+    "issued_at": "2026-10-30T23:59:59.999999Z",
+    "reasons": [],
+    "time_state": "CURRENT"
+  },
+  "independent_reproduction": "NOT_ESTABLISHED",
+  "legal_compliance": "NOT_ASSESSED",
+  "limitations": [
+    "Synthetic offline intake only; no provider connection, transmission gate or deletion operation.",
+    "Receiver binding and current context are not signed by this experiment; their protection and authenticity are caller assumptions.",
+    "Stateless comparison cannot detect coordinated rollback of both receiver-supplied contexts or a dishonest current clock.",
+    "Raw pins fix selected bytes without independently establishing their source, completeness or truth.",
+    "The original VAP cutoff and report are preserved; current-time follow-up never creates deletion evidence.",
+    "The interpreter, installed dependencies and receiver code remain trusted execution prerequisites; import isolation is not an OS sandbox."
+  ],
+  "production_observed": false,
+  "review_status": "READY_FOR_SCOPED_REVIEW",
+  "source": {
+    "commit": "62d15f1b8d3c46a1704acb7c0d5631622e1a5608",
+    "import_isolation": "VERIFIED_RUNTIME_COPY_WITH_ISOLATED_PYTHON",
+    "os_sandbox": "NOT_PROVIDED",
+    "receiver_pin_raw_sha256": "22ca2ba7dcbb1996e746b593be0737e8a837ac54f79c35b5ab856a44fa84254a",
+    "repository": "https://github.com/veritaschain/vap-spec",
+    "verified_files": 22
+  },
+  "synthetic": true,
+  "vap_report": {
+    "adapter": "incident-retention-adapter/0.1",
+    "as_of": "2026-10-30T23:59:59.999999Z",
+    "erasure_report": {
+      "adapter": "incident-evidence-adapter/0.1",
+      "as_of": "2026-10-30T23:59:59.999999Z",
+      "assessments": {
+        "binding_assessment": "MATCH",
+        "deletion_evidence": "REQUEST_ONLY",
+        "excluded_scope_outcome": "UNKNOWN",
+        "independent_verification": "NOT_ESTABLISHED",
+        "outside_scope_outcome": "UNKNOWN",
+        "provider_completion": "UNKNOWN",
+        "receipt_applicability": "NOT_ESTABLISHED",
+        "review_result": "NOT_ESTABLISHED",
+        "target_completion": "UNKNOWN"
+      },
+      "evaluation_id": "retention-evaluation-synthetic",
+      "evidence_checks": [
+        {
+          "binding_differences": [],
+          "eligibility": "ELIGIBLE",
+          "evaluation": "MATCH",
+          "identity": "EXPECTED_ISSUER",
+          "kind": "erasure.request",
+          "record_id": "request-record-synthetic",
+          "role": "AUTHORIZED",
+          "signature": "VERIFIED",
+          "time": "WITHIN_DECLARED_WINDOW"
+        }
+      ],
+      "evidence_integrity": "VERIFIED_UNDER_EVALUATOR_TRUST",
+      "external_anchor_verification": "NOT_IMPLEMENTED",
+      "findings": [
+        {
+          "code": "ERASURE_LOCAL_REQUEST_ESTABLISHED",
+          "record_ids": [
+            "request-record-synthetic"
+          ]
+        }
+      ],
+      "format": "incident-evidence-report/0.1",
+      "full_cap_conformance": "NOT_ASSESSED",
+      "full_vap_conformance": "NOT_ASSESSED",
+      "implementation_version": "0.1.0",
+      "input_sha256": "923d34a61ce725c75a2cc5be2c1b9bc5c86cc6973aa4e58f406c4c0a441d0920",
+      "legal_compliance": "NOT_ASSESSED",
+      "limitations": [
+        "Application-layer experimental assessment; no normative VAP or CAP conformance determination.",
+        "Evaluator trust configuration and issuer/organization assignments are explicit external assumptions.",
+        "Valid signatures attribute records; they do not independently prove claim truth or event time.",
+        "Missing records cannot establish absence of activity outside the declared observation scope.",
+        "Block and hold outputs are recommendations; this offline program controls no live gateway or publisher.",
+        "Provider statements and limited reviews cannot establish universal external deletion.",
+        "External anchoring, positive XREF, key revocation, production identity onboarding and legal compliance are not assessed."
+      ],
+      "synthetic": true,
+      "target_sha256": "5c19a93892baf41d9127f0da0648779f22d5409caf245ca98da14eabf40319e1",
+      "trust_sha256": "5039eb50d1579ce9be742ee7d13ee8832b86321f4cefad5e626e19cae1f7ebe9",
+      "workflow": "erasure"
+    },
+    "evaluation_id": "retention-evaluation-synthetic",
+    "external_anchor_verification": "NOT_IMPLEMENTED",
+    "follow_up_reasons": [],
+    "format": "retention-evidence-report/0.1",
+    "full_vap_conformance": "NOT_ASSESSED",
+    "implementation_version": "0.1.0",
+    "input_sha256": "f7e111fcba7920923c7797b0490cd0cab53ef444ab10ece16f31d224f868326d",
+    "legal_compliance": "NOT_ASSESSED",
+    "limitations": [
+      "Experimental offline adapter; no live provider, storage inspection or deletion operation.",
+      "Signatures attribute statements under evaluator-supplied identity and role assumptions; they do not prove their truth or time.",
+      "A source reference and digest do not retrieve or validate the referenced terms document.",
+      "Processing locations, training settings, retention exceptions and presence are attributed statements, not independent measurements by this program.",
+      "Only explicit timezone-bearing deadlines are compared; durations and unknown trigger times are not calculated.",
+      "Later presence may reflect recreation or restoration; it does not establish continuous retention or falsity of an earlier deletion claim.",
+      "The legacy erasure report remains a separate assessment; this adapter never manufactures a completion, review or ERASURE record.",
+      "No independent reproduction, external anchoring, production key onboarding/revocation, legal compliance or VAP conformance is established."
+    ],
+    "presence_reports": [],
+    "record_checks": [
+      {
+        "binding": "MATCH",
+        "binding_differences": [],
+        "eligibility": "ELIGIBLE",
+        "evaluation": "MATCH",
+        "identity": "EXPECTED_ISSUER",
+        "key_validity": "WITHIN_VALIDITY",
+        "kind": "retention.statement",
+        "observation_time": "NOT_APPLICABLE",
+        "record_id": "retention.statement-1",
+        "request": "MATCH",
+        "role": "AUTHORIZED",
+        "scope": "WITHIN_REQUEST",
+        "signature": "VERIFIED",
+        "time": "WITHIN_CUTOFF"
+      }
+    ],
+    "retention_evidence_integrity": "VERIFIED_AND_APPLICABLE_UNDER_EVALUATOR_TRUST",
+    "statements": [
+      {
+        "deadline_state": "BEFORE_DECLARED_DEADLINE",
+        "evidence_basis": "AUTHENTICATED_PROVIDER_STATEMENT",
+        "exceptions": [],
+        "issuer": "provider-synthetic",
+        "locations": [
+          "active",
+          "provider-log"
+        ],
+        "locations_without_provider_completion_claim": [
+          "active",
+          "provider-log"
+        ],
+        "processing_locations": [
+          "JP"
+        ],
+        "provider_completion_claim_record_ids": [],
+        "record_id": "retention.statement-1",
+        "recorded_at": "2026-10-01T01:00:00Z",
+        "request_record_id": "request-record-synthetic",
+        "schedule": {
+          "deadline": "2026-10-31T00:00:00Z",
+          "kind": "stated-deadline"
+        },
+        "terms_ref": "https://provider.example.invalid/terms/synthetic-v1",
+        "terms_sha256": "328522f5f1444cd04dbbf5e1f9497a900f5608a19cc435009a0d675a2597f01b",
+        "training_use": "reported-disabled"
+      }
+    ],
+    "synthetic": true,
+    "target_sha256": "5c19a93892baf41d9127f0da0648779f22d5409caf245ca98da14eabf40319e1",
+    "trust_sha256": "01933dbb2293cf893d1ed009b6c56bbba2245c8f051eb8e69e6c3d84c855120a",
+    "universal_deletion": "NOT_ESTABLISHED"
+  }
+}

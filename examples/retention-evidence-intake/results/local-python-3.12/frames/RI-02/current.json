@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-10-31T00:00:00Z",
+  "context": {
+    "config_digest": "abababababababababababababababababababababababababababababababab",
+    "environment": "synthetic",
+    "generation": 1,
+    "policy_revision": "receiver-demo/1",
+    "release": "r1",
+    "scope": "synthetic-provider-and-object",
+    "service": "synthetic-retention-review"
+  },
+  "format": "evidect-retention-current/0.1"
+}

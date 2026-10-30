@@ -62,4 +62,10 @@ node examples/execution-authorization/demo.mjs
 
 The [Japanese regulatory/control/evidence mapping, §8.4](docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md#retention-evidence-adapter) now links the separately versioned [VAP retention adapter at its reviewed source](https://github.com/veritaschain/vap-spec/blob/62d15f1b8d3c46a1704acb7c0d5631622e1a5608/experiments/incident-retention-adapter/README.md). That offline experiment keeps attributed processing conditions, stated deadlines and scoped deletion evidence separate. It preserves the original erasure assessment and never turns elapsed time into completion evidence. The mapping identifies its recorded tests and the remaining provider, trust and operational integration conditions.
 
-The adapter resides in the VAP repository; this site does not invoke it or include it in the observation walkthrough. Its evidence and follow-up results are not automatically converted into EVIDECT control PASS/FAIL, legal compliance or certification decisions.
+The adapter resides in the VAP repository; the public website does not invoke it or include it in the observation walkthrough. Its evidence and follow-up results are not automatically converted into EVIDECT control PASS/FAIL, legal compliance or certification decisions.
+
+### Receiver-side retention intake
+
+The [offline intake example](examples/retention-evidence-intake/README.md) re-evaluates original signed input using separately selected receiver trust, an evidence/context binding and current context. It checks the pinned upstream source before execution and compares current time and generation without rewriting the historical VAP report. Its separate review states identify readiness, revalidation needs or unresolved evidence; `control_status` remains `UNASSESSABLE`.
+
+The receiver binding is a caller-protected choice, not a provider signature over EVIDECT context. The example supports synthetic inputs and performs no live provider request or deletion. See the [input contract](examples/retention-evidence-intake/CONTRACT.md) for the raw-byte pins, isolated CLI and remaining trust assumptions.
