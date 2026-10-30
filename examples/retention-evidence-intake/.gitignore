@@ -1,4 +1,5 @@
 .venv/
 generated/
+generated-followup/
 __pycache__/
 *.pyc

@@ -5,6 +5,13 @@ The four frames reuse one fixed public VAP fixture, `RT-01`, and vary receiver
 time, receiver generation or a signed statement. They are four receiver
 scenarios, not four observed provider operations or additional VAP case types.
 
+This is the historical capture included in [PR24][pr24], fixed to EVIDECT source
+commit [`c9489e3e75bd60a09bab8f8f25ce22f59b0e65aa`][source]. Its **19 tests,
+four frames and four saved-input rechecks** describe that version only. Later
+follow-up functionality and changes to the workflow or source inventory are
+not covered by this capture. The saved files and their original hashes remain
+unchanged.
+
 ## Local capture
 
 | Item | Recorded value |
@@ -16,6 +23,7 @@ scenarios, not four observed provider operations or additional VAP case types.
 | Saved-input rechecks matching the complete saved report | `4 / 4` |
 | Historical VAP report unchanged in time/context frames | `true` |
 | Receiver implementation/contract/workflow files in capture manifest | `14` |
+| Receiver source commit containing this capture | `c9489e3e75bd60a09bab8f8f25ce22f59b0e65aa` |
 | Separately verified upstream source files | `22` |
 | Upstream commit | `62d15f1b8d3c46a1704acb7c0d5631622e1a5608` |
 
@@ -43,19 +51,23 @@ event timestamp.
 signature verification. Every frame has `control_status: UNASSESSABLE`,
 `legal_compliance: NOT_ASSESSED` and `production_observed: false`.
 
-The accompanying local unit suite completed with **19 tests, no skips, OK**, using
+The PR24 local unit suite completed with **19 tests, no skips, OK**, using
 `-W error::ResourceWarning`. This is a separate execution count, not a field in
 the demo summary. Its checks include independent receiver selection of trust,
 raw-byte changes, target-binding mismatches, current time and context changes,
 signature failures, verified-source import isolation, malformed JSON,
-non-regular files and output preservation. The two CI Python versions execute
+non-regular files and output preservation. PR24's two CI Python versions executed
 the same tests and frames; they do not double the number of distinct scenarios.
 
 ## Inspect or reproduce a saved frame
 
-Prepare the pinned upstream checkout and dependencies as described in the
-[example README](../README.md). From the example directory, explicitly select
-all four files for the illustrative `RI-02` frame:
+To reproduce the exact implementation recorded here, use a separate EVIDECT
+checkout at the [fixed PR24 source][source], as well as the pinned upstream
+checkout and dependencies described in that version's [example README][source-readme].
+The capture's 14 source hashes refer to files at that version; a later checkout
+may intentionally contain different code, tests or workflow bytes. From the
+fixed version's example directory, explicitly select all four files for the
+illustrative `RI-02` frame:
 
 ```sh
 .venv/bin/python -I -B intake.py review \
@@ -73,7 +85,7 @@ files are illustrative selections by the same test controller, not an
 operational enrollment or authorization process. A real receiver must select
 and protect those assumptions separately from the candidate evidence.
 
-[demo.py](../demo.py) creates a new output directory, then reads the actual saved
+[The PR24 demo][source-demo] creates a new output directory, then reads the actual saved
 four inputs for every frame and compares the entire regenerated report with the
 saved report. For `RI-01` through `RI-03` it also compares the historical VAP
 report with the original pinned fixture report. Its summary contains each
@@ -85,3 +97,8 @@ The capture is distinct from subsequent GitHub Actions outputs. Use an actual
 workflow run and its artifacts when making claims about CI. No result here
 establishes a production control, successful deletion, legal compliance,
 certification or independent third-party review.
+
+[pr24]: https://github.com/veritaschain/evidect-site/pull/24
+[source]: https://github.com/veritaschain/evidect-site/tree/c9489e3e75bd60a09bab8f8f25ce22f59b0e65aa/examples/retention-evidence-intake
+[source-readme]: https://github.com/veritaschain/evidect-site/blob/c9489e3e75bd60a09bab8f8f25ce22f59b0e65aa/examples/retention-evidence-intake/README.md
+[source-demo]: https://github.com/veritaschain/evidect-site/blob/c9489e3e75bd60a09bab8f8f25ce22f59b0e65aa/examples/retention-evidence-intake/demo.py
