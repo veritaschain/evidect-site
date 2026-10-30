@@ -1,0 +1,6 @@
+{
+  "case_id": "synthetic-review-workflow",
+  "decision_raw_sha256": "076a04807b759f17dc2d2bb24e1397a5e0d1712bdfe780a3ab50aec560b9f7ea",
+  "expires_at": "2026-11-03T00:00:00Z",
+  "format": "evidect-retention-review-checkpoint/0.1"
+}

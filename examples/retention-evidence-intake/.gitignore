@@ -1,5 +1,6 @@
 .venv/
 generated/
 generated-followup/
+generated-workflow/
 __pycache__/
 *.pyc

@@ -1,0 +1,60 @@
+{
+  "action": "CLOSE_REVIEW",
+  "assignment_sha256": "6426fdf63e2f7db19cbd83e4c8529c2021351da7e503745aacde6e9cb4a5a554",
+  "case_id": "synthetic-review-workflow",
+  "criteria": "evidect-retention-review/0.1",
+  "decision_id": "synthetic-close-review-1",
+  "dossier_sha256": "3855e89847f35d99ab527f156434e813b380eacd676104857dbbc29b6fe742d5",
+  "expires_at": "2026-11-02T00:00:00Z",
+  "format": "evidect-retention-review-decision/0.1",
+  "items": [
+    {
+      "disposition": "REVIEWED",
+      "item_sha256": "02f0a831cb374165831f563898f381fbb6bfc2f4791d20454dbdf3de23e10f4a",
+      "note": "Synthetic scoped disposition for this acceptance test; no deletion or control finding.",
+      "snapshot_ids": [
+        "snapshot-01",
+        "snapshot-02"
+      ]
+    },
+    {
+      "disposition": "REVIEWED",
+      "item_sha256": "44761105d6e29fd541a94bfa380a9c91b34066f280f21d4f5bb8565927aff50b",
+      "note": "Synthetic scoped disposition for this acceptance test; no deletion or control finding.",
+      "snapshot_ids": [
+        "snapshot-01",
+        "snapshot-02"
+      ]
+    }
+  ],
+  "key_id": "3c0f088091c84914a73eb567054e2180fbfa6854d984d06717075681e3a06897",
+  "note": "Synthetic test decision only; no human or production review is established.",
+  "requirements": [
+    {
+      "disposition": "REVIEWED",
+      "note": "Synthetic scoped disposition for this acceptance test; no deletion or control finding.",
+      "requirement_sha256": "09ec142dc9626fefe67bfdb035a732416eb345cb9ca8f941ceda3809a90d51eb",
+      "snapshot_ids": [
+        "snapshot-01",
+        "snapshot-02"
+      ]
+    }
+  ],
+  "review_current": {
+    "checked_at": "2026-10-30T23:59:59.999999Z",
+    "context": {
+      "config_digest": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "environment": "synthetic",
+      "generation": 1,
+      "policy_revision": "receiver-followup-demo/1",
+      "release": "r1",
+      "scope": "synthetic-provider-and-object",
+      "service": "synthetic-retention-followup"
+    },
+    "format": "evidect-retention-current/0.1"
+  },
+  "review_current_report_sha256": "c49a85c1ff2030b668064f41f1da8bbc6ebd403490504853fdc77f86439e1595",
+  "reviewer_ref": "synthetic-reviewer",
+  "reviewer_trust_sha256": "2ff3d2fd0ec9e04b6ac91722f21a3b597180e30e0512d610950c27671e270735",
+  "target_sha256": "5c19a93892baf41d9127f0da0648779f22d5409caf245ca98da14eabf40319e1"
+}
