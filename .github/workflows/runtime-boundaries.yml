@@ -1,0 +1,105 @@
+name: Experimental runtime boundaries
+
+on:
+  pull_request:
+    paths:
+      - 'examples/runtime-boundaries/**'
+      - 'examples/execution-authorization/**'
+      - '.github/workflows/runtime-boundaries.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'examples/runtime-boundaries/**'
+      - 'examples/execution-authorization/**'
+      - '.github/workflows/runtime-boundaries.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-boundaries-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boundaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run offline gate and boundary tests
+        shell: bash
+        env:
+          RESULTS: ${{ runner.temp }}/evidect-runtime-boundaries-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RESULTS"
+          node --test --test-reporter=tap examples/execution-authorization/gate.test.mjs 2>&1 | tee "$RESULTS/gate-tests.tap"
+          node --test --test-reporter=tap examples/runtime-boundaries/boundary.test.mjs 2>&1 | tee "$RESULTS/boundary-tests.tap"
+      - name: Generate and check the synthetic report
+        shell: bash
+        env:
+          RESULTS: ${{ runner.temp }}/evidect-runtime-boundaries-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          umask 077
+          node examples/runtime-boundaries/demo.mjs > "$RESULTS/report.json"
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+
+          const output = process.env.RESULTS;
+          const report = JSON.parse(readFileSync(join(output, 'report.json'), 'utf8'));
+          const caseIds = ['stable', 'artifact-change', 'destination-change', 'observer-replaced',
+            'denied', 'denied-with-effect', 'observer-stop-before', 'observer-stop-after'];
+          assert.equal(report.format, 'evidect-runtime-boundaries/1');
+          assert.equal(report.experiment, 'first_party_synthetic');
+          assert.equal(report.test_result, 'PASS');
+          assert.deepEqual(report.cases.map(item => item.case_id), caseIds);
+          assert.ok(report.cases.every(item => item.test_result === 'PASS'));
+          for (const key of ['production_observed', 'independent_assessment', 'runtime_attestation',
+            'external_anchor_verified', 'report_signed']) assert.equal(report[key], false);
+          assert.equal(report.control_status, 'NOT_ASSESSED');
+          assert.equal(report.legal_compliance, 'NOT_ASSESSED');
+
+          const sources = readdirSync('examples/runtime-boundaries', { withFileTypes: true })
+            .filter(entry => entry.isFile() && /\.(mjs|md)$/.test(entry.name))
+            .map(entry => `examples/runtime-boundaries/${entry.name}`);
+          sources.push('examples/execution-authorization/gate.mjs',
+            'examples/execution-authorization/demo.mjs',
+            'examples/execution-authorization/gate.test.mjs',
+            '.github/workflows/runtime-boundaries.yml');
+          const sourceSha256 = Object.fromEntries(sources.sort().map(path =>
+            [path, createHash('sha256').update(readFileSync(path)).digest('hex')]));
+          const provenance = {
+            format: 'evidect-runtime-boundaries-ci/1',
+            commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+            node: process.version, platform: process.platform, arch: process.arch,
+            report_sha256: createHash('sha256').update(readFileSync(join(output, 'report.json'))).digest('hex'),
+            source_sha256: sourceSha256,
+            note: 'CI execution metadata and byte identities; no runtime attestation or independent assessment.'
+          };
+          writeFileSync(join(output, 'provenance.json'), JSON.stringify(provenance, null, 2) + '\n',
+            { flag: 'wx', mode: 0o600 });
+          console.log('Eight synthetic cases matched expectations; control/legal status remains NOT_ASSESSED.');
+          JS
+          git diff --exit-code -- examples/runtime-boundaries examples/execution-authorization .github/workflows/runtime-boundaries.yml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: runtime-boundaries-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidect-runtime-boundaries-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
