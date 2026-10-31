@@ -58,6 +58,15 @@ node --test examples/execution-authorization/gate.test.mjs
 node examples/execution-authorization/demo.mjs
 ```
 
+### Measured context and separately observed effects
+
+The [runtime boundary experiment](examples/runtime-boundaries/README.md) adds a separate signed approval over a selected synthetic file's digest, a fixed local destination and an observer process identity. It remeasures that context before dispatch and compares authorization with journal contents read by a separate child process. Eight cases cover changes after approval, a deliberately injected effect after denial, and observer replacement or stoppage. Missing observations remain indeterminate; a passing test means the expected case behavior occurred. The controller and host remain trusted, and the experiment is not runtime attestation, independent assessment or a reconstruction of the motivating incidents.
+
+```sh
+node --test examples/runtime-boundaries/boundary.test.mjs
+node examples/runtime-boundaries/demo.mjs
+```
+
 ## Related retention evidence experiment
 
 The [Japanese regulatory/control/evidence mapping, §8.4](docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md#retention-evidence-adapter) now links the separately versioned [VAP retention adapter at its reviewed source](https://github.com/veritaschain/vap-spec/blob/62d15f1b8d3c46a1704acb7c0d5631622e1a5608/experiments/incident-retention-adapter/README.md). That offline experiment keeps attributed processing conditions, stated deadlines and scoped deletion evidence separate. It preserves the original erasure assessment and never turns elapsed time into completion evidence. The mapping identifies its recorded tests and the remaining provider, trust and operational integration conditions.
