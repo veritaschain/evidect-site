@@ -53,9 +53,11 @@ jobs:
           node --version >> "$RESULTS/environment.txt"
           node --test --test-reporter=tap examples/execution-authorization/gate.test.mjs 2>&1 | tee "$RESULTS/gate-tests.tap"
           node --test --test-reporter=tap examples/execution-authorization/service-routing/routing.test.mjs 2>&1 | tee "$RESULTS/service-routing-tests.tap"
+          node --test --test-reporter=tap examples/execution-authorization/service-routing/receiver.test.mjs 2>&1 | tee "$RESULTS/routing-receiver-tests.tap"
           node --test --test-reporter=tap examples/runtime-boundaries/boundary.test.mjs 2>&1 | tee "$RESULTS/boundary-tests.tap"
           python3 -I -B tools/context-observer/test_handoff.py -v 2>&1 | tee "$RESULTS/legacy-handoff-tests.log"
           python3 -I -B examples/runtime-boundaries/test_handoff.py -v 2>&1 | tee "$RESULTS/runtime-handoff-tests.log"
+          python3 -I -B examples/execution-authorization/service-routing/test_handoff.py -v 2>&1 | tee "$RESULTS/routing-handoff-tests.log"
       - name: Check synthetic routing and retained receiver verification
         shell: bash
         env:
@@ -65,6 +67,7 @@ jobs:
           umask 077
           node examples/execution-authorization/service-routing/demo.mjs > "$RESULTS/service-routing-report.json"
           python3 -I -B examples/runtime-boundaries/handoff_demo.py --output "$RESULTS/demo"
+          python3 -I -B examples/execution-authorization/service-routing/handoff_demo.py --output "$RESULTS/routing-handoff"
           python3 -I -B - <<'PY'
           import hashlib
           import json
@@ -153,15 +156,91 @@ jobs:
           if receiver['control_status'] != 'NOT_ASSESSED' or receiver['legal_compliance'] != 'NOT_ASSESSED':
               raise SystemExit('Unexpected assessment claim')
 
-          artifacts = {}
-          for path in sorted(demo.rglob('*')):
-              if path.is_symlink():
-                  raise SystemExit('Unexpected output link')
-              if path.is_file():
-                  raw = path.read_bytes()
-                  if b'-----BEGIN PRIVATE KEY-----' in raw or b'-----BEGIN ENCRYPTED PRIVATE KEY-----' in raw:
-                      raise SystemExit('Private key material must not be retained')
-                  artifacts[str(path.relative_to(demo))] = hashlib.sha256(raw).hexdigest()
+          routing_demo = result_root / 'routing-handoff'
+          routing_summary = json.loads((routing_demo / 'summary.json').read_bytes())
+          routing_receiver = json.loads((routing_demo / 'receiver.json').read_bytes())
+          saved_routing_raw = (routing_demo / 'delivery/service-routing-report.json').read_bytes()
+          saved_package_raw = (routing_demo / 'delivery/observation.handoff.json').read_bytes()
+          if not (routing_summary['format'] == 'evidect-service-routing-handoff-demo/1'
+                  and routing_summary['test_result'] == 'PASS'
+                  and routing_summary['routing_report_sha256'] == hashlib.sha256(saved_routing_raw).hexdigest()
+                  and routing_summary['handoff_package_sha256'] == hashlib.sha256(saved_package_raw).hexdigest()):
+              raise SystemExit('Unexpected saved routing summary')
+          expected_demo_checks = {
+              'sender_removed_before_verification': True, 'private_key_in_output': False,
+              'fixed_ten_cases_consistent': True, 'fixed_fixture_expectations_matched': True,
+              'repeated_verification_matches': True, 'missing_trust_not_adopted': True,
+              'changed_bytes_rejected': True,
+          }
+          if routing_summary['checks'] != expected_demo_checks:
+              raise SystemExit('Saved routing demo checks changed')
+          if not (routing_receiver['format'] == 'evidect-service-routing-receiver/1'
+                  and routing_receiver['local_status'] == 'VALID'
+                  and routing_receiver['overall_status'] == 'INDETERMINATE'
+                  and routing_receiver['content_binding']['status'] == 'VALID'
+                  and routing_receiver['routing_sha256'] == hashlib.sha256(saved_routing_raw).hexdigest()
+                  and routing_receiver['routing']['status'] == 'RECOMPUTED'
+                  and routing_receiver['routing']['records_consistent'] is True
+                  and routing_receiver['routing']['source_test_result'] == 'PASS'):
+              raise SystemExit('Unexpected routing receiver result')
+          saved_cases = routing_receiver['routing']['cases']
+          if [case['case_id'] for case in saved_cases] != [item[0] for item in expected_cases]:
+              raise SystemExit('Unexpected saved routing case order')
+          for case, (case_id, calls, attempts) in zip(saved_cases, expected_cases):
+              totals = case['totals']
+              previews = 1 if case_id in ('service-revoked-after-preview', 'user-revoked-after-preview') else 0
+              if not (totals == {'attempt_count': attempts, 'preview_count': previews,
+                                 'dispatch_calls': calls, 'marker_delta': calls,
+                                 'reported_tool_calls': calls, 'reported_marker_count': calls}
+                      and case['record_consistency'] == 'CONSISTENT'
+                      and case['mismatched_fields'] == []
+                      and case['reported_test_result'] == 'PASS'
+                      and set(case['checks']) == {'attempt_order', 'route_digests', 'decision_records',
+                                                 'preview_records', 'tool_totals'}
+                      and all(value is True for value in case['checks'].values())):
+                  raise SystemExit('Unexpected saved routing relations')
+          if routing_summary['case_results'] != saved_cases:
+              raise SystemExit('Saved routing summary changed receiver records')
+          expected_limits = {
+              'original_signatures': 'NOT_REVERIFIED',
+              'historical_user_authorization': 'NOT_REVERIFIED',
+              'historical_service_permission': 'NOT_REVERIFIED',
+              'request_route_binding': 'NOT_REVERIFIED', 'nonce_use': 'NOT_REVERIFIED',
+              'observation_authenticity': 'NOT_INDEPENDENTLY_ESTABLISHED',
+              'route_identity': 'SYNTHETIC_LABELS_NOT_RUNTIME_MEASUREMENT',
+              'tool_state': 'REPORTED_NOT_REOBSERVED', 'coverage': 'FIXED_TEN_CASE_RECORDS_ONLY',
+              'source_test_result': 'REPORTED_NOT_REASSESSED', 'live_collection': 'NOT_PERFORMED',
+              'observer_trust': 'SAME_CONTROLLER_PRODUCER', 'trust': 'RECEIVER_SELECTED_OUT_OF_BAND',
+              'checkpoint': 'CALLER_PROTECTED_STATE', 'verification': 'REPEATABLE_NO_NONCE_CONSUMPTION',
+          }
+          if routing_receiver['limits'] != expected_limits:
+              raise SystemExit('Routing receiver scope changed')
+          for report in (routing_receiver, routing_summary):
+              for key in ('report_signed', 'production_observed', 'independent_assessment',
+                          'runtime_attestation', 'external_anchor_verified'):
+                  if report[key] is not False:
+                      raise SystemExit('Unexpected saved routing assurance claim')
+              if report['control_status'] != 'NOT_ASSESSED' or report['legal_compliance'] != 'NOT_ASSESSED':
+                  raise SystemExit('Unexpected saved routing assessment claim')
+
+          def artifact_hashes(directory):
+              hashes = {}
+              for path in sorted(directory.rglob('*')):
+                  if path.is_symlink():
+                      raise SystemExit('Unexpected output link')
+                  if path.is_file():
+                      raw = path.read_bytes()
+                      if b'-----BEGIN PRIVATE KEY-----' in raw or b'-----BEGIN ENCRYPTED PRIVATE KEY-----' in raw:
+                          raise SystemExit('Private key material must not be retained')
+                      hashes[str(path.relative_to(directory))] = hashlib.sha256(raw).hexdigest()
+              return hashes
+
+          artifacts = artifact_hashes(demo)
+          routing_artifacts = artifact_hashes(routing_demo)
+          if set(routing_artifacts) != {'delivery/service-routing-report.json', 'delivery/observation.handoff.json',
+                                        'test-trust/observer-public.pem', 'test-trust/checkpoint.json',
+                                        'receiver.json', 'summary.json'}:
+              raise SystemExit('Unexpected retained routing files')
           source_paths = sorted(path for path in Path('examples/runtime-boundaries').iterdir()
                                 if path.is_file() and path.suffix in ('.mjs', '.py', '.md'))
           source_paths.extend(Path('tools/context-observer') / name for name in
@@ -169,7 +248,8 @@ jobs:
           source_paths.extend(Path('examples/execution-authorization') / name for name in
                               ('gate.mjs', 'demo.mjs', 'gate.test.mjs'))
           source_paths.extend(Path('examples/execution-authorization/service-routing') / name for name in
-                              ('routing.mjs', 'demo.mjs', 'routing.test.mjs', 'README.md'))
+                              ('routing.mjs', 'demo.mjs', 'routing.test.mjs', 'README.md', 'receiver.mjs',
+                               'receiver.test.mjs', 'handoff.py', 'handoff_demo.py', 'test_handoff.py', 'HANDOFF.md'))
           source_paths.append(Path('.github/workflows/runtime-handoff.yml'))
           provenance = {
               'format': 'evidect-runtime-handoff-ci/1',
@@ -180,12 +260,13 @@ jobs:
                                 for path in source_paths},
               'demo_sha256': artifacts,
               'service_routing_report_sha256': hashlib.sha256(routing_raw).hexdigest(),
+              'routing_handoff_demo_sha256': routing_artifacts,
               'notice': 'First-party synthetic verification; test trust is not independent authority.'
           }
           with (result_root / 'provenance.json').open('x', encoding='utf-8') as output:
               json.dump(provenance, output, ensure_ascii=True, indent=2)
               output.write('\n')
-          print('Ten synthetic routing cases and eight recorded cases were checked; historical authority in the eight-case receiver remains NOT_REVERIFIED.')
+          print('Ten synthetic routing cases, a saved ten-case routing report and eight recorded runtime cases were checked; original authority remains NOT_REVERIFIED in both receivers.')
           PY
           git diff --exit-code -- examples/runtime-boundaries examples/execution-authorization tools/context-observer .github/workflows/runtime-handoff.yml
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

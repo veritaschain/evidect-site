@@ -115,6 +115,17 @@ sessionと二つの状態は信頼側の試験入力であり、未信頼のHTTP
 | `route-changed-after-approval` | 承認後にrouteを変えて元の要求・承認を使う | 0 |
 | `consumed-request-replay` | dispatch済み要求の再送を拒否 | 1 |
 
+## 保存済み報告の受取検証
+
+[保存とオフライン検証の手順](HANDOFF.md)では、元の10ケースJSONを既存の署名付きreceiptへ
+hash・sizeで結び付け、送信側の一時領域を除去した後に別の受取処理で照合します。
+受取側は元のデモやツールを再実行せず、報告されたrouteのhash、試行順、判定・preview・件数の整合を確認します。
+
+報告には元の署名付き要求・承認、当時の許諾状態、nonceが含まれません。
+特に報告されたrouteとresourceの一致は、原要求への署名束縛を再検証した結果ではありません。
+元の`test_result`は申告値として残し、狭い照合が通っても総合評価は`INDETERMINATE`です。
+この専用adapterも、同じcontrollerが試験用の信頼設定を用意する合成実験です。
+
 ## テスト・CI・証拠の限界
 
 [既存のhandoff CI](../../../.github/workflows/runtime-handoff.yml)に、routingの独立テストとdemoの
