@@ -86,12 +86,31 @@ handoffでは`local_status: VALID`でも、総合結果を安全性の合格に�
 `overall_status`は不一致時の`INVALID`、それ以外は`INDETERMINATE`であり、原署名と
 過去の認可は`NOT_REVERIFIED`のままである。[実装と限界](../examples/runtime-boundaries/HANDOFF.md)
 
-次に実験を拡張する場合の候補は以下の3点。**このメモでは実装・試験していない。**
+次の3点は、このメモの初版で挙げた実験の候補。
+**初版の文書更新時点では未実装・未試験だった。** 同日後続の実装範囲を下に追記する。
 
 1. 本人の委任が有効でも、サービス側の許諾がない／失効している場合を区別する合成試験。
 2. モデルの拒否後に、別モデル・送信先・非AI経路へ移る各試行の認可と観測を関連付ける試験。
 3. 観測と要約の両方を整合させて再署名した負の対照。狭い整合確認が通っても、
    観測の真実性を確認したことにはならず、総合結果が不明のまま残ることを確認する。
+
+### 同日追記：合成実験と負の対照
+
+候補1・2には、[service-routingの10ケース](../examples/execution-authorization/service-routing/README.md)を追加した。
+既存要求の`resource`に合成のprovider・model・destination・channelのdigestを結び付け、
+本人側の委任と、別に用意した現在のサービス許諾を確認する。拒否後のモデル切替や非AI経路も
+別試行として記録し、過去の承認や先行試行の成功を次の許可へ自動移植しない。
+両側の許諾と時刻は同じcontrollerの信頼側入力で、実銀行の許諾・実モデルの応答・独立観測ではない。
+
+候補3には、[受取側テスト](../examples/runtime-boundaries/test_handoff.py)の
+`test_consistent_snapshot_forgery_needs_new_pin_and_never_establishes_truth`を追加した。
+実際に保存した観測をコピーし、実行前観測と要約を整合するように変更して同じ試験鍵で再署名する。
+**元のcheckpointでは拒否される。** 試験側が改変版の新checkpointを別途採用すると、
+ローカルな整合確認は通っても、総合結果は`INDETERMINATE`となる。
+署名や固定済みcheckpointを突破したという試験ではなく、採用した観測の真実性が別問題であることを確認する。
+
+新しい10ケースのレポートは未署名で、既存の8ケースを受け取るhandoffとは別の合成レポートである。
+実装の起動方法と限界は各READMEに記載する。実行成功は、利用するコミットに対応するCIやテスト結果で確認する。
 
 ## 5. 規制への言及を限定する
 
@@ -124,7 +143,9 @@ The cases are attributed vendor disclosure, malware-sample analysis, and reporti
 They motivate evidence and authorization questions; they do not establish that missing logs caused the events
 or that VAP would have prevented them. Existing synthetic gates and handoff verification are mapped only to
 their actual scope. Service permission, model-routing observation, truthful collection and legal conclusions
-remain separate. The three proposed tests are not implemented by this documentation change.
+remain separate. The three proposals were unimplemented in the initial documentation change.
+The same-day follow-up above links a synthetic service-routing experiment and a consistent-forgery
+negative control; neither establishes live service permission or truthful observation.
 
 [chainalysis]: https://www.chainalysis.com/blog/security-incident-october-30/
 [talos]: https://blog.talosintelligence.com/appraisal-by-ai-model-driven-victim-prioritization-in-the-volta-infostealer/

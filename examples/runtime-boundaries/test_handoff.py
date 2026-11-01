@@ -268,6 +268,71 @@ class RuntimeHandoffTests(unittest.TestCase):
         self.assertFalse(result["summary_matches"])
         self.assertTrue({"effect_assessment", "observed_effect_count", "counts_by_destination"}.issubset(result["mismatched_fields"]))
 
+    def test_consistent_snapshot_forgery_needs_new_pin_and_never_establishes_truth(self):
+        # The once-collected source is the test's reference, not an independent
+        # production witness. Its real controller injection must remain visible.
+        original_value = copy.deepcopy(self.runtime_value)
+        original_bytes = self.runtime_bytes
+        original = original_value["cases"][5]
+        self.assertEqual(original["case_id"], "denied-with-effect")
+        self.assertEqual((original["authorization"], original["effect_assessment"],
+                          original["observed_effect_count"]), ("DENY", "CONTRADICTION", 1))
+        self.assertEqual(original["observations"]["before"]["journals"], {"slot-a": [], "slot-b": []})
+        self.assertEqual(original["observations"]["after"]["journals"], {
+            "slot-a": [{"runId": original["run_id"], "operationId": original["operation_id"],
+                        "marker": "synthetic-marker", "origin": "controller_fault_injection"}],
+            "slot-b": []})
+
+        value = copy.deepcopy(original_value)
+        case = value["cases"][5]
+        # A dishonest trusted producer claims the later effect was already
+        # present before dispatch, then supplies a matching zero-delta summary.
+        # No live case is rerun and no original after-snapshot is changed.
+        case["observations"]["before"]["journals"] = copy.deepcopy(case["observations"]["after"]["journals"])
+        case.update({"observation": "AVAILABLE", "effect_assessment": "CONSISTENT",
+                     "observed_effect_count": 0, "counts_by_destination": {"slot-a": 0, "slot-b": 0}})
+        forged = self.make_delivery(encode(value))
+        self.assertNotEqual(forged["runtime"], original_bytes)
+        self.assertEqual(forged["pin"]["key_fingerprint"], self.delivery["pin"]["key_fingerprint"])
+        self.assertNotEqual(forged["pin"]["receipt_sha256"], self.delivery["pin"]["receipt_sha256"])
+
+        with patch.object(obs, "observe", side_effect=AssertionError("Receiver must not recollect")):
+            old_pin = adapter.verify_delivery(forged["package"], forged["runtime"], self.key["publicKey"],
+                                              self.delivery["pin"], now=self.now)
+            # The harness separately accepts a new checkpoint for the forged
+            # bytes. The producer has not bypassed the receiver's original pin.
+            report = self.verify(forged)
+
+        self.assert_not_adopted(old_pin, "INVALID")
+        self.assertEqual(old_pin["overall_status"], "INVALID")
+        self.assertEqual(old_pin["content_binding"]["status"], "NOT_CHECKED")
+        self.assertTrue(report["handoff"]["baseline_usable"])
+        self.assertEqual(report["local_status"], "VALID")
+        self.assertEqual(report["content_binding"]["status"], "VALID")
+        self.assertEqual(report["runtime"]["status"], "RECOMPUTED")
+        self.assertTrue(report["runtime"]["claimed_summaries_match"])
+        result = report["runtime"]["cases"][5]
+        self.assertEqual(result["reported"]["authorization"], "DENY")
+        self.assertEqual(result["reported"]["fixture_dispatch"], "NOT_DISPATCHED")
+        self.assertEqual(result["reported"]["test_result"], "PASS")
+        self.assertEqual(result["recomputed"], {
+            "observation": "AVAILABLE", "effect_assessment": "CONSISTENT",
+            "observed_effect_count": 0, "counts_by_destination": {"slot-a": 0, "slot-b": 0}})
+        self.assertTrue(result["summary_matches"])
+        self.assertEqual(result["mismatched_fields"], [])
+        self.assertEqual(report["overall_status"], "INDETERMINATE")
+        self.assert_limits(report)
+        for name, expected in {
+            "observation_authenticity": "NOT_INDEPENDENTLY_ESTABLISHED",
+            "authorization_scope": "CONDITIONAL_ON_REPORTED_AUTHORIZATION",
+            "challenge_scope": "RECORDED_PAIR_CORRELATION_ONLY",
+            "effect_attribution": "CONTROLLER_FIXTURE_NOT_DENIED_AGENT",
+            "trust": "RECEIVER_SELECTED_OUT_OF_BAND", "checkpoint": "CALLER_PROTECTED_STATE",
+        }.items():
+            self.assertEqual(report["limits"][name], expected)
+        self.assertEqual(self.runtime_value, original_value)
+        self.assertEqual(self.runtime_bytes, original_bytes)
+
     def test_source_test_fail_is_reported_without_redefining_evidence_integrity(self):
         value = copy.deepcopy(self.runtime_value)
         value["test_result"] = "FAIL"
