@@ -205,3 +205,15 @@ Reverification is read-only, its output is unsigned, and no runtime attestation 
 A negative control changes observations and summaries together: the original checkpoint rejects the new
 receipt, while separately adopting its matching checkpoint permits a narrow local match without proving
 truthful collection. Overall status remains INDETERMINATE and inner authority remains NOT_REVERIFIED.
+
+## 保存結果の評価時刻とcheckpoint
+
+受取側の派生結果は `evidect-runtime-receiver/2`、保存デモは `evidect-runtime-handoff-demo/2` です。元の署名・receipt・runtime report・checkpointの入力形式は変わりません。旧 `receiver/1` は過去の未署名スナップショットであり、現在の有効性を確認する場合は原入力と別途選択した現在のtrustを使って再検証します。
+
+`receiver.json` の `verification` には、`evaluated_at_unix`（期限判断に使用したUNIX秒）、`time_source`（CLIは `SYSTEM_CLOCK`、内部Python APIの指定時刻は `CALLER_SUPPLIED`）、`clock: LOCAL_UNATTESTED`、`checkpoint_sha256`（選択checkpointの正規化JSONのSHA-256）、`checkpoint_digest_scope: CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR`、`checkpoint_expires_at_unix`、`result_scope: AS_OF_EVALUATION_TIME`、`refresh: REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST` を保持します。
+
+基準時刻は認証と派生結果で同じ値を使用します。期限直前は再検証可能ですが、期限ちょうどと期限後は `INDETERMINATE` になり、意味上の再計算は `NOT_RECOMPUTED` です。既知の署名・checkpointの不一致は `INVALID` を維持します。過去の成功結果を現在の成功へ自動的に更新しません。
+
+このcheckpointハッシュは識別子であって信頼アンカーでも、有効期限の延長許可でもありません。ローカル時刻は署名付きの時刻証明ではなく、古い証拠と古いcheckpointを同時に戻すrollbackを防止しません。新しい世代の証拠やcheckpointを採用する権限は、検証器の外側で別途管理する必要があります。
+
+再検証のたびに評価時刻だけが変わり得るため、デモは `verification.evaluated_at_unix` 以外の判定とcheckpointメタデータを全件比較します。出力は未署名で、VAP/VCPの適合認定や独立した監査ではありません。

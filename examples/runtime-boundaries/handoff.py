@@ -6,12 +6,14 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import time
 
 HERE = Path(__file__).resolve().parent
 _spec = importlib.util.spec_from_file_location(
@@ -20,10 +22,11 @@ legacy = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(legacy)
 auth, obs = legacy.auth, legacy.obs
 
-FORMAT = "evidect-runtime-receiver/1"
+FORMAT = "evidect-runtime-receiver/2"
 RUNTIME_NAME = "runtime-report.json"
 MAX_RUNTIME_BYTES = 128 * 1024
 MAX_WORKER_OUTPUT = 64 * 1024
+MAX_VERIFICATION_TIME = 253402300799
 CONTEXT_LABELS = {"service": "runtime-boundaries-fixture", "environment": "synthetic",
                   "scope": "eight-runtime-cases", "policy_revision": "runtime-receiver-v1"}
 CASE_IDS = ("stable", "artifact-change", "destination-change", "observer-replaced", "denied",
@@ -58,6 +61,22 @@ def _hash(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def _verification_time(now):
+    """Choose one bounded expiry reference, not a completion or attested time."""
+    if now is not None:
+        if type(now) is not int or not 0 <= now <= MAX_VERIFICATION_TIME:
+            raise RuntimeHandoffError("INVALID_VERIFICATION_TIME", 2)
+        return now, "CALLER_SUPPLIED"
+    try:
+        sampled = time.time()
+    except Exception:
+        raise RuntimeHandoffError("INVALID_VERIFICATION_TIME", 2) from None
+    if type(sampled) not in (int, float) or (type(sampled) is float and not math.isfinite(sampled)) or not (
+            0 <= sampled <= MAX_VERIFICATION_TIME):
+        raise RuntimeHandoffError("INVALID_VERIFICATION_TIME", 2)
+    return int(sampled), "SYSTEM_CLOCK"
+
+
 def _not_recomputed(reason):
     return {"status": "NOT_RECOMPUTED", "reason": reason, "claimed_summaries_match": None, "cases": []}
 
@@ -66,10 +85,10 @@ def _invalid_runtime():
     return {"status": "INVALID_INPUT", "reason": "RUNTIME_REPORT_INVALID", "claimed_summaries_match": None, "cases": []}
 
 
-def _report(raw_package, raw_runtime, handoff):
+def _report(raw_package, raw_runtime, handoff, verification):
     local = handoff["local_status"]
     return {"format": FORMAT, "package_sha256": _hash(raw_package), "runtime_sha256": _hash(raw_runtime),
-            "handoff": handoff, "content_binding": {"status": "NOT_CHECKED", "reason": "HANDOFF_NOT_VERIFIED"},
+            "verification": verification, "handoff": handoff, "content_binding": {"status": "NOT_CHECKED", "reason": "HANDOFF_NOT_VERIFIED"},
             "runtime": _not_recomputed("HANDOFF_NOT_VERIFIED"), "local_status": local,
             "overall_status": "INVALID" if local == "INVALID" else "INDETERMINATE",
             "report_signed": False, "production_observed": False, "independent_assessment": False,
@@ -163,15 +182,29 @@ def verify_delivery(raw_package, raw_runtime, trusted_public_key=None, expected_
         raise RuntimeHandoffError("PACKAGE_SIZE_OR_TYPE_INVALID")
     if type(raw_runtime) is not bytes or not 0 < len(raw_runtime) <= MAX_RUNTIME_BYTES:
         raise RuntimeHandoffError("RUNTIME_SIZE_OR_TYPE_INVALID")
+    evaluated_at, time_source = _verification_time(now)
     try:
-        handoff = legacy.verify_package(raw_package, trusted_public_key, expected_checkpoint, now=now)
+        # Own the selected checkpoint once; authentication and metadata share it.
+        pin, pin_bytes = None, None
+        if expected_checkpoint is not None:
+            auth.checkpoint(expected_checkpoint)
+            pin_bytes = obs.canonical(expected_checkpoint)
+            pin = obs.strict_json(pin_bytes)
+        verification = {"evaluated_at_unix": evaluated_at, "time_source": time_source,
+                        "clock": "LOCAL_UNATTESTED",
+                        "checkpoint_sha256": _hash(pin_bytes) if pin_bytes is not None else None,
+                        "checkpoint_digest_scope": "CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR",
+                        "checkpoint_expires_at_unix": pin["expires_at"] if pin is not None else None,
+                        "result_scope": "AS_OF_EVALUATION_TIME",
+                        "refresh": "REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST"}
+        handoff = legacy.verify_package(raw_package, trusted_public_key, pin, now=evaluated_at)
     except (legacy.HandoffError, auth.AuthenticationError, obs.ObservationError) as error:
         if str(error) in ("NODE_UNAVAILABLE", "CRYPTO_HELPER_UNAVAILABLE", "UNSUPPORTED_PLATFORM_NO_SAFE_DIRECTORY_IO"):
             raise RuntimeHandoffError("HANDOFF_VERIFIER_UNAVAILABLE", 2) from None
         raise RuntimeHandoffError("INVALID_HANDOFF_INPUT") from None
     except (OSError, ValueError, TypeError, RecursionError):
         raise RuntimeHandoffError("HANDOFF_VERIFIER_UNAVAILABLE", 2) from None
-    result = _report(raw_package, raw_runtime, handoff)
+    result = _report(raw_package, raw_runtime, handoff, verification)
     if not handoff["baseline_usable"]:
         return result
     # Reuse the same immutable original bytes; never follow a receipt path.

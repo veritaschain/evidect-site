@@ -153,3 +153,13 @@ approvals, authority snapshots and nonces are absent. A matching route digest is
 to an original signed request. Source test results remain reported, and overall status stays
 INDETERMINATE after a valid local check. Test trust comes from the same controller; the report and
 receiver output are unsigned, and neither independent collection nor production authority is established.
+
+## 保存結果の評価時刻とcheckpoint
+
+派生結果の形式は `evidect-service-routing-receiver/2`、保存デモの形式は `evidect-service-routing-handoff-demo/2` です。元の10ケースの報告、署名済みreceipt、handoff package、checkpointの入力形式は変更していません。旧 `receiver/1` から現在の成功判定を自動的に作る処理はありません。
+
+`receiver.json` の `verification` には、`evaluated_at_unix`、`time_source`、`clock: LOCAL_UNATTESTED`、`checkpoint_sha256`（選択したcheckpointを正規化したJSONのSHA-256）、`checkpoint_digest_scope: CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR`、`checkpoint_expires_at_unix`、`result_scope: AS_OF_EVALUATION_TIME`、`refresh: REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST` を記録します。期限判定と結果に書き込む基準時刻は同じ1回の取得値です。外部の信頼時刻ではありません。
+
+期限ちょうど／期限後の再検証は、署名が有効でも `INDETERMINATE`／終了コード2です。元から確定している不一致は `INVALID` を優先します。古いスナップショットを現在の成功として使用せず、受信時の原入力・公開鍵・現在のcheckpointを別途選び直してください。checkpointのハッシュは同一性識別に過ぎず、採用権限・最新版保証・巻戻し防止・時刻証明ではありません。
+
+再実行デモでは評価時刻以外の全フィールドを照合し、同じtrust・checkpoint条件の整合が保たれるか確かめます。実際のサービス権限・原署名・nonce・経路の真実性は `NOT_REVERIFIED` で、総合結果は引き続き `INDETERMINATE` です。
