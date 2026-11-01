@@ -1,0 +1,62 @@
+name: Experimental receiver checkpoint memory
+
+on:
+  pull_request:
+    paths:
+      - 'examples/receiver-state/**'
+      - 'examples/runtime-boundaries/**'
+      - 'examples/execution-authorization/**'
+      - 'tools/context-observer/**'
+      - '.github/workflows/receiver-state.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'examples/receiver-state/**'
+      - 'examples/runtime-boundaries/**'
+      - 'examples/execution-authorization/**'
+      - 'tools/context-observer/**'
+      - '.github/workflows/receiver-state.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: receiver-state-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  state:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Test operator-owned state and real signed deliveries
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 -I -B examples/receiver-state/test_state.py -v
+          python3 -I -B examples/receiver-state/test_integration.py -v
+      - name: Recheck existing authorization and handoff contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test examples/execution-authorization/gate.test.mjs
+          node --test examples/execution-authorization/service-routing/routing.test.mjs
+          node --test examples/execution-authorization/service-routing/receiver.test.mjs
+          node --test examples/runtime-boundaries/boundary.test.mjs
+          python3 -I -B tools/context-observer/test_handoff.py -v
+          python3 -I -B examples/runtime-boundaries/test_handoff.py -v
+          python3 -I -B examples/execution-authorization/service-routing/test_handoff.py -v
