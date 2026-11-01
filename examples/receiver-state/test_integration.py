@@ -128,6 +128,19 @@ class IntegrationTests(unittest.TestCase):
         changed = {**delivery, "report": delivery["report"] + b"\n"}
         self.assertEqual(self.verify("runtime", changed)["local_status"], "INVALID")
 
+    def test_receipt_context_commitment_is_checked_by_existing_verifier(self):
+        delivery = self.delivery("runtime")
+        self.assertNotEqual(delivery["pin"]["context_digest"], receiver.state.digest(delivery["pin"]["context"]))
+        changed = {**delivery, "pin": {**delivery["pin"], "context_digest": "0" * 64}}
+        with self.assertRaises(receiver.StateError) as caught:
+            self.adopt("runtime", changed)
+        self.assertEqual(caught.exception.code, "CANDIDATE_NOT_VERIFIED")
+        with self.assertRaises(receiver.StateError) as missing:
+            self.store.select("runtime", "runtime")
+        self.assertEqual(missing.exception.code, "STREAM_NOT_PROVISIONED")
+        self.adopt("runtime", delivery)
+        self.assertEqual(self.verify("runtime", delivery)["local_status"], "VALID")
+
     def test_cli_uses_persisted_selection_without_accepting_sender_pin(self):
         delivery = self.delivery("routing")
         paths = {}

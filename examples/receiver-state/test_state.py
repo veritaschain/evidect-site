@@ -151,11 +151,13 @@ class StateTests(unittest.TestCase):
         self.assert_code("CHECKPOINT_EXPIRED", self.adopt, pin(2, expires=NOW))
         self.assertEqual(self.store.select("s", "runtime")["generation"], 1)
 
-    def test_bad_checkpoint_shapes_and_context_digest_fail(self):
+    def test_bad_checkpoint_shapes_and_digest_encoding_fail(self):
         candidates = [None, {}, {**pin(), "extra": True}, {**pin(), "expires_at": True}, pin(True)]
         for candidate in candidates:
             self.assert_code("CHECKPOINT_INVALID", self.store.adopt, "s", "runtime", candidate, PUBLIC, now=NOW)
-        self.assert_code("CONTEXT_DIGEST_MISMATCH", self.adopt, {**pin(), "context_digest": "0" * 64})
+        self.assert_code("CHECKPOINT_INVALID", self.adopt, {**pin(), "context_digest": "not-a-digest"})
+        # The store must not reinterpret the receipt commitment as context-only.
+        self.assertEqual(state.checkpoint({**pin(), "context_digest": "0" * 64})["context_digest"], "0" * 64)
 
     def test_invalid_stream_key_and_time(self):
         self.assert_code("STREAM_IDENTITY_INVALID", self.adopt, stream="")

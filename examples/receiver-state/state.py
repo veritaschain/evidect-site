@@ -61,8 +61,8 @@ def checkpoint(value):
         raise StateError("CHECKPOINT_INVALID")
     if not all(fingerprint(value[k]) for k in ("receipt_sha256", "key_fingerprint", "context_digest")):
         raise StateError("CHECKPOINT_INVALID")
-    if digest(context) != value["context_digest"]:
-        raise StateError("CONTEXT_DIGEST_MISMATCH")
+    # context_digest binds context AND selected files in the receipt format.
+    # Only the existing signed-receipt verifier has that complete input.
     return json.loads(canonical(value))
 
 
