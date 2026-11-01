@@ -5,6 +5,10 @@
 This ledger records attribution, not liability or technical attribution findings. Its sources motivate
 questions; they do not supply incident telemetry, credentials, payloads or findings to the synthetic lab.
 
+The [2026-11-01 follow-up review](../../docs/AGENTIC_INCIDENT_REVIEW_2026-11-01.ja.md) covers
+Chainalysis, the VOLTA sample analysis and US bank access restrictions. It separates source findings,
+authorization questions and the limits of the existing synthetic gate and receiver.
+
 ## Cursor — vendor statement
 
 [Cursor's notice][cursor], published October 29 and updated October 30 at 11:30 PT, identifies
