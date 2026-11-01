@@ -67,6 +67,12 @@ node --test examples/runtime-boundaries/boundary.test.mjs
 node examples/runtime-boundaries/demo.mjs
 ```
 
+The [offline runtime handoff](examples/runtime-boundaries/HANDOFF.md) connects these results to the existing signed observation format. A receiver separately selects trust and a current checkpoint, checks the original report bytes, and recomputes the recorded observations against the producer's reported authorization. The original request and approval signatures are not reverified. A synthetic walkthrough retains the original delivery inputs for later checks and removes its temporary sender files and signing key before receiver verification.
+
+```sh
+python3 -I -B examples/runtime-boundaries/handoff_demo.py --output ./runtime-handoff-results
+```
+
 ## Related retention evidence experiment
 
 The [Japanese regulatory/control/evidence mapping, §8.4](docs/REGULATORY_CONTROL_EVIDENCE_MAPPING_2026-10-29.ja.md#retention-evidence-adapter) now links the separately versioned [VAP retention adapter at its reviewed source](https://github.com/veritaschain/vap-spec/blob/62d15f1b8d3c46a1704acb7c0d5631622e1a5608/experiments/incident-retention-adapter/README.md). That offline experiment keeps attributed processing conditions, stated deadlines and scoped deletion evidence separate. It preserves the original erasure assessment and never turns elapsed time into completion evidence. The mapping identifies its recorded tests and the remaining provider, trust and operational integration conditions.

@@ -1,0 +1,133 @@
+name: Offline runtime evidence handoff
+
+on:
+  pull_request:
+    paths:
+      - 'examples/runtime-boundaries/**'
+      - 'examples/execution-authorization/**'
+      - 'tools/context-observer/**'
+      - '.github/workflows/runtime-handoff.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'examples/runtime-boundaries/**'
+      - 'examples/execution-authorization/**'
+      - 'tools/context-observer/**'
+      - '.github/workflows/runtime-handoff.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-handoff-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  handoff:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Test original contracts and the runtime receiver
+        shell: bash
+        env:
+          RESULTS: ${{ runner.temp }}/evidect-runtime-handoff-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RESULTS"
+          git rev-parse HEAD > "$RESULTS/source-commit.txt"
+          python3 --version > "$RESULTS/environment.txt"
+          node --version >> "$RESULTS/environment.txt"
+          node --test --test-reporter=tap examples/execution-authorization/gate.test.mjs 2>&1 | tee "$RESULTS/gate-tests.tap"
+          node --test --test-reporter=tap examples/runtime-boundaries/boundary.test.mjs 2>&1 | tee "$RESULTS/boundary-tests.tap"
+          python3 -I -B tools/context-observer/test_handoff.py -v 2>&1 | tee "$RESULTS/legacy-handoff-tests.log"
+          python3 -I -B examples/runtime-boundaries/test_handoff.py -v 2>&1 | tee "$RESULTS/runtime-handoff-tests.log"
+      - name: Run a retained synthetic delivery and receiver verification
+        shell: bash
+        env:
+          RESULTS: ${{ runner.temp }}/evidect-runtime-handoff-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 -I -B examples/runtime-boundaries/handoff_demo.py --output "$RESULTS/demo"
+          python3 -I -B - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          result_root = Path(os.environ['RESULTS'])
+          demo = result_root / 'demo'
+          summary = json.loads((demo / 'summary.json').read_bytes())
+          receiver = json.loads((demo / 'receiver.json').read_bytes())
+          if summary.get('test_result') != 'PASS':
+              raise SystemExit('Synthetic handoff did not complete successfully')
+          if not (receiver['format'] == 'evidect-runtime-receiver/1'
+                  and receiver['local_status'] == 'VALID'
+                  and receiver['overall_status'] == 'INDETERMINATE'
+                  and receiver['content_binding']['status'] == 'VALID'
+                  and receiver['runtime']['status'] == 'RECOMPUTED'
+                  and receiver['runtime']['claimed_summaries_match'] is True
+                  and len(receiver['runtime']['cases']) == 8):
+              raise SystemExit('Unexpected receiver result')
+          for key in ('report_signed', 'production_observed', 'independent_assessment',
+                      'runtime_attestation', 'external_anchor_verified'):
+              if receiver[key] is not False:
+                  raise SystemExit('Unexpected assurance claim')
+          if receiver['control_status'] != 'NOT_ASSESSED' or receiver['legal_compliance'] != 'NOT_ASSESSED':
+              raise SystemExit('Unexpected assessment claim')
+
+          artifacts = {}
+          for path in sorted(demo.rglob('*')):
+              if path.is_symlink():
+                  raise SystemExit('Unexpected output link')
+              if path.is_file():
+                  raw = path.read_bytes()
+                  if b'-----BEGIN PRIVATE KEY-----' in raw or b'-----BEGIN ENCRYPTED PRIVATE KEY-----' in raw:
+                      raise SystemExit('Private key material must not be retained')
+                  artifacts[str(path.relative_to(demo))] = hashlib.sha256(raw).hexdigest()
+          source_paths = sorted(path for path in Path('examples/runtime-boundaries').iterdir()
+                                if path.is_file() and path.suffix in ('.mjs', '.py', '.md'))
+          source_paths.extend(Path('tools/context-observer') / name for name in
+                              ('observe.py', 'authenticated.py', 'handoff.py', 'receipt_crypto.mjs', 'test_handoff.py'))
+          source_paths.extend(Path('examples/execution-authorization') / name for name in
+                              ('gate.mjs', 'demo.mjs', 'gate.test.mjs'))
+          source_paths.append(Path('.github/workflows/runtime-handoff.yml'))
+          provenance = {
+              'format': 'evidect-runtime-handoff-ci/1',
+              'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'python': sys.version.split()[0],
+              'node': subprocess.check_output(['node', '--version'], text=True).strip(),
+              'source_sha256': {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                                for path in source_paths},
+              'demo_sha256': artifacts,
+              'notice': 'First-party synthetic verification; test trust is not independent authority.'
+          }
+          with (result_root / 'provenance.json').open('x', encoding='utf-8') as output:
+              json.dump(provenance, output, ensure_ascii=True, indent=2)
+              output.write('\n')
+          print('Eight recorded cases were rechecked; inner authority remains NOT_REVERIFIED.')
+          PY
+          git diff --exit-code -- examples/runtime-boundaries examples/execution-authorization tools/context-observer .github/workflows/runtime-handoff.yml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: success()
+        with:
+          name: runtime-handoff-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidect-runtime-handoff-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
