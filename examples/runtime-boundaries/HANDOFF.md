@@ -129,6 +129,25 @@ runtime JSONは128 KiBまで、既存handoffは128 KiB・復号receiptは64 KiB�
 記録上の主張として残ります。逆にproducerが件数や評価を書き換えて、受取側の再計算と
 食い違う要約を正しく署名して届けても、要約不一致として`INVALID`になります。
 
+### 観測と要約を共に改変した負の対照
+
+adapterに追加した整合偽造のテスト（全28件のうち1件）は、保存された観測行と要約を整合するように共に改変し、試験鍵で
+新たなreceiptに署名する条件を扱います。対象は既存8ケースのコピーであり、受取側に新しい
+ケース形式を追加したり、受取側で元のruntimeを再実行して観測を取り直したりはしません。
+`denied-with-effect`で実行後の行をbeforeにも写し、開始前から存在したように記録して、
+要約を増分0・`CONSISTENT`に変更します。
+
+| 渡す記録と受取側が選ぶcheckpoint | 狭いローカル照合の期待結果 |
+| --- | --- |
+| 観測を保持して要約だけを改変し、再署名した記録に対応するcheckpointを選ぶ | 既存テストで要約不一致の`INVALID` |
+| 観測と要約を共に改変し再署名するが、元のcheckpointを維持する | 新しい記録との結び付きが一致せず`INVALID` |
+| 同じ改変版について、試験harnessが対応する新checkpointを別途採用する | 記録内の整合は`local_status: VALID`でも、`overall_status: INDETERMINATE` |
+
+最後の条件でも、元署名・当時の認可は`NOT_REVERIFIED`のままで、観測の真実性・完全性や独立性を
+確立したことにはなりません。新checkpointを選ぶのも同じfirst-partyのharnessです。配送物からの
+自動信頼、元checkpointの突破、実際の侵害の再現を示すテストではありません。
+署名とバイト列の対応が正しくても、採用する原記録の信頼性は別途必要であることを確認します。
+
 ## 維持する限界
 
 有効な署名は、指定鍵と元バイト列の関係を確認します。元の観測が真実で完全であること、
@@ -161,13 +180,16 @@ python3 -I -B examples/runtime-boundaries/test_handoff.py -v
 python3 -I -B tools/context-observer/test_handoff.py -v
 node --test --test-reporter=tap examples/execution-authorization/gate.test.mjs
 node --test --test-reporter=tap examples/runtime-boundaries/boundary.test.mjs
+node --test --test-reporter=tap examples/execution-authorization/service-routing/routing.test.mjs
 ```
 
 [専用CI](../../.github/workflows/runtime-handoff.yml)は、Ubuntu 24.04／macOS 15で
-Python 3.12・Node.js 22系を用い、既存ゲート37件、既存boundary43件、既存handoff、追加adapterの
-テストと通しデモを実行します。CI設定の存在と実行成功は別なので、利用するコミットに対応するrunを確認します。
+Python 3.12・Node.js 22系を用い、既存ゲート37件、既存boundary43件、既存handoff、adapterの
+28件（上の負の対照1件を含む）と、[サービス許諾・routing実験](../execution-authorization/service-routing/README.md)の
+テスト・demoを実行します。CI設定の存在と実行成功は別なので、利用するコミットに対応するrunを確認します。
 
-成功時に保存するCI成果物は、合成の原delivery、試験用公開trust、受取側結果、実行環境・ソースhash・テストログです。
+成功時に保存するCI成果物は、合成の原delivery、試験用公開trust、受取側結果、別のrouting報告、
+実行環境・ソースhash・テストログです。routing報告はこのreceiverの固定8ケース入力には含めません。
 保持期間は14日ですが、合成checkpointの1時間の期限は延長しません。秘密鍵は保存しません。
 CI基盤によるcheckout・ランタイム準備・成果物保存を除き、fixtureはネットワークを使いません。
 新しい定期実行や手動連携はなく、権限は`contents: read`、checkoutの認証情報保存は無効です。
@@ -180,3 +202,6 @@ recorded effects conditional on the producer's reported authorization; original 
 historical authority are not reverified. A genuine contradiction or unavailable observation remains so.
 The retained test trust is provisioned by the same synthetic harness, not an independent authority.
 Reverification is read-only, its output is unsigned, and no runtime attestation or control approval follows.
+A negative control changes observations and summaries together: the original checkpoint rejects the new
+receipt, while separately adopting its matching checkpoint permits a narrow local match without proving
+truthful collection. Overall status remains INDETERMINATE and inner authority remains NOT_REVERIFIED.
