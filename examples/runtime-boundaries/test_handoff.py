@@ -137,6 +137,24 @@ class RuntimeHandoffTests(unittest.TestCase):
         self.assertEqual(report["limits"]["observer_trust"], "SAME_USER_HOST_PRODUCER")
         self.assertEqual(report["limits"]["live_collection"], "NOT_PERFORMED")
 
+    def assert_verification(self, report, pin, *, at=None, source="CALLER_SUPPLIED", bounds=None):
+        value = report["verification"]
+        evaluated = value["evaluated_at_unix"]
+        self.assertIs(type(evaluated), int)
+        self.assertGreaterEqual(evaluated, 0)
+        self.assertLessEqual(evaluated, 253402300799)
+        self.assertEqual(value, {
+            "evaluated_at_unix": evaluated, "time_source": source, "clock": "LOCAL_UNATTESTED",
+            "checkpoint_sha256": hashlib.sha256(obs.canonical(pin)).hexdigest() if pin is not None else None,
+            "checkpoint_digest_scope": "CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR",
+            "checkpoint_expires_at_unix": pin["expires_at"] if pin is not None else None,
+            "result_scope": "AS_OF_EVALUATION_TIME", "refresh": "REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST"})
+        if at is not None:
+            self.assertEqual(evaluated, at)
+        if bounds is not None:
+            self.assertLessEqual(bounds[0], evaluated)
+            self.assertLessEqual(evaluated, bounds[1])
+
     def assert_not_adopted(self, report, local_status):
         self.assertEqual(report["local_status"], local_status)
         self.assertEqual(report["runtime"]["status"], "NOT_RECOMPUTED")
@@ -146,7 +164,8 @@ class RuntimeHandoffTests(unittest.TestCase):
 
     def test_real_eight_case_roundtrip_preserves_contradiction_unknowns_and_limits(self):
         report = self.verify()
-        self.assertEqual(report["format"], "evidect-runtime-receiver/1")
+        self.assertEqual(report["format"], "evidect-runtime-receiver/2")
+        self.assert_verification(report, self.delivery["pin"], at=self.now)
         self.assertEqual(report["local_status"], "VALID")
         self.assertEqual(report["overall_status"], "INDETERMINATE")
         self.assertEqual(report["content_binding"]["status"], "VALID")
@@ -195,9 +214,16 @@ class RuntimeHandoffTests(unittest.TestCase):
             second = self.verify()
         self.assertEqual(first, second)
         self.assertEqual(first["local_status"], "VALID")
+        before = int(time.time())
         result = self.cli(*self.cli_args(paths))
+        after = int(time.time())
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), first)
+        received = json.loads(result.stdout)
+        self.assert_verification(received, self.delivery["pin"], source="SYSTEM_CLOCK", bounds=(before, after))
+        expected = copy.deepcopy(first)
+        expected["verification"].update(time_source="SYSTEM_CLOCK",
+                                        evaluated_at_unix=received["verification"]["evaluated_at_unix"])
+        self.assertEqual(received, expected)
         self.assertFalse(private.exists())
         for path, data in original.items():
             self.assertEqual(path.read_bytes(), data)
@@ -556,7 +582,10 @@ class RuntimeHandoffTests(unittest.TestCase):
             self.assertNotIn(b"BEGIN PRIVATE KEY", data)
         rerun = self.cli(*self.cli_args(paths))
         self.assertEqual(rerun.returncode, 0, rerun.stderr)
-        self.assertEqual(json.loads(rerun.stdout), json.loads((output / "receiver.json").read_bytes()))
+        report = json.loads(rerun.stdout)
+        original = json.loads((output / "receiver.json").read_bytes())
+        self.assertEqual({**report, "verification": {k: v for k, v in report["verification"].items() if k != "evaluated_at_unix"}},
+                         {**original, "verification": {k: v for k, v in original["verification"].items() if k != "evaluated_at_unix"}})
         report = json.loads(rerun.stdout)
         self.assertEqual(report["runtime"]["cases"][5]["recomputed"]["effect_assessment"], "CONTRADICTION")
         self.assertIsNone(report["runtime"]["cases"][-1]["recomputed"]["observed_effect_count"])
@@ -564,6 +593,96 @@ class RuntimeHandoffTests(unittest.TestCase):
         blocked = subprocess.run(command, cwd=REPO, capture_output=True, text=True, timeout=15)
         self.assertNotEqual(blocked.returncode, 0)
         self.assertEqual({path.relative_to(output): path.read_bytes() for path in output.rglob("*") if path.is_file()}, baseline)
+
+
+    def test_checkpoint_expiry_boundary_does_not_refresh_a_saved_verdict(self):
+        expiry = self.delivery["pin"]["expires_at"]
+        before = adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                         self.delivery["pin"], now=expiry - 1)
+        snapshot = copy.deepcopy(before)
+        self.assertEqual(before["local_status"], "VALID")
+        self.assert_verification(before, self.delivery["pin"], at=expiry - 1)
+        with patch.object(adapter, "_recompute", side_effect=AssertionError("No untrusted semantic recomputation")):
+            for moment in (expiry, expiry + 1):
+                report = adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                                  self.delivery["pin"], now=moment)
+                self.assert_not_adopted(report, "INDETERMINATE")
+                self.assertEqual(report["overall_status"], "INDETERMINATE")
+                self.assertEqual(report["content_binding"]["status"], "NOT_CHECKED")
+                self.assertEqual(report["package_sha256"], before["package_sha256"])
+                self.assert_verification(report, self.delivery["pin"], at=moment)
+        self.assertEqual(before, snapshot)
+
+    def test_evaluation_time_is_sampled_once_and_used_for_authentication(self):
+        expiry = self.delivery["pin"]["expires_at"]
+        with patch.object(adapter.time, "time", side_effect=[expiry - 0.25, expiry + 2]) as clock, \
+                patch.object(legacy, "verify_package", wraps=legacy.verify_package) as verified:
+            report = adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                             self.delivery["pin"])
+        clock.assert_called_once_with()
+        self.assertEqual(verified.call_count, 1)
+        self.assertEqual(verified.call_args.kwargs["now"], expiry - 1)
+        self.assertEqual(report["local_status"], "VALID")
+        self.assert_verification(report, self.delivery["pin"], at=expiry - 1, source="SYSTEM_CLOCK")
+
+    def test_checkpoint_identity_is_canonical_and_not_a_trust_anchor(self):
+        pin = self.delivery["pin"]
+        reordered = dict(reversed(list(pin.items())))
+        reordered["context"] = dict(reversed(list(pin["context"].items())))
+        first = self.verify()
+        same = adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                       reordered, now=self.now)
+        self.assertEqual(same, first)
+        extended = {**pin, "expires_at": pin["expires_at"] + 1}
+        changed = adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                          extended, now=self.now)
+        self.assertEqual(changed["local_status"], "VALID")
+        self.assertNotEqual(changed["verification"]["checkpoint_sha256"], first["verification"]["checkpoint_sha256"])
+        self.assertEqual(changed["package_sha256"], first["package_sha256"])
+        captured = copy.deepcopy(pin)
+        selected = copy.deepcopy(pin)
+        original_verify = legacy.verify_package
+        def mutate_caller(raw, public, owned, *, now):
+            self.assertIsNot(owned, selected)
+            selected["expires_at"] = self.now
+            selected["context"]["generation"] += 1
+            return original_verify(raw, public, owned, now=now)
+        with patch.object(legacy, "verify_package", side_effect=mutate_caller):
+            copied = adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                             selected, now=self.now)
+        self.assertEqual(copied["local_status"], "VALID")
+        self.assert_verification(copied, captured, at=self.now)
+
+    def test_invalid_time_rejected_before_authentication(self):
+        with patch.object(legacy, "verify_package", side_effect=AssertionError("No authentication")), \
+                patch.object(adapter, "_recompute", side_effect=AssertionError("No worker")):
+            for moment in (True, 1.0, -1, 253402300800, float("nan"), float("inf"), "invalid"):
+                with self.subTest(explicit=repr(moment)):
+                    with self.assertRaises(adapter.RuntimeHandoffError) as raised:
+                        adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                                self.delivery["pin"], now=moment)
+                    self.assertEqual((raised.exception.code, raised.exception.exit_code),
+                                     ("INVALID_VERIFICATION_TIME", 2))
+            for moment in (True, None, -0.25, float("nan"), float("inf"), "invalid"):
+                with self.subTest(system=repr(moment)), patch.object(adapter.time, "time", return_value=moment):
+                    with self.assertRaises(adapter.RuntimeHandoffError):
+                        adapter.verify_delivery(self.delivery["package"], self.runtime_bytes, self.key["publicKey"],
+                                                self.delivery["pin"])
+
+    def test_old_and_new_generation_pin_matrix_preserves_known_mismatch(self):
+        newer = self.make_delivery(self.runtime_bytes, context_patch={"release": "receiver-test-r2", "generation": 2})
+        for delivery in (self.delivery, newer):
+            self.assertEqual(self.verify(delivery)["local_status"], "VALID")
+        with patch.object(adapter, "_recompute", side_effect=AssertionError("No worker")):
+            for delivery, selected, expected in (
+                (self.delivery, newer["pin"], "INVALID"),
+                (newer, self.delivery["pin"], "INVALID"),
+                (newer, {**newer["pin"], "expires_at": self.now}, "INDETERMINATE"),
+                (self.delivery, {**newer["pin"], "expires_at": self.now}, "INVALID")):
+                result = adapter.verify_delivery(delivery["package"], delivery["runtime"],
+                                                 self.key["publicKey"], selected, now=self.now)
+                self.assert_not_adopted(result, expected)
+                self.assert_verification(result, selected, at=self.now)
 
 
 if __name__ == "__main__":

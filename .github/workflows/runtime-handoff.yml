@@ -136,12 +136,33 @@ jobs:
           if routing['control_status'] != 'NOT_ASSESSED' or routing['legal_compliance'] != 'NOT_ASSESSED':
               raise SystemExit('Unexpected service routing assessment claim')
 
+          def check_verification_context(directory, report, summary):
+              checkpoint = json.loads((directory / 'test-trust/checkpoint.json').read_bytes())
+              pin_bytes = json.dumps(checkpoint, sort_keys=True, separators=(',', ':'),
+                                     ensure_ascii=True, allow_nan=False).encode('ascii')
+              ver = report['verification']
+              evaluated = ver['evaluated_at_unix']
+              if not (type(evaluated) is int and
+                      checkpoint['expires_at'] - 3600 <= evaluated < checkpoint['expires_at']):
+                  raise SystemExit('Verification reference time is outside synthetic validity')
+              expected = {
+                  'evaluated_at_unix': evaluated, 'time_source': 'SYSTEM_CLOCK',
+                  'clock': 'LOCAL_UNATTESTED',
+                  'checkpoint_sha256': hashlib.sha256(pin_bytes).hexdigest(),
+                  'checkpoint_digest_scope': 'CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR',
+                  'checkpoint_expires_at_unix': checkpoint['expires_at'],
+                  'result_scope': 'AS_OF_EVALUATION_TIME',
+                  'refresh': 'REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST',
+              }
+              if ver != expected or summary['checkpoint_expires_at'] != checkpoint['expires_at']:
+                  raise SystemExit('Saved receiver verification context does not match retained checkpoint')
+
           demo = result_root / 'demo'
           summary = json.loads((demo / 'summary.json').read_bytes())
           receiver = json.loads((demo / 'receiver.json').read_bytes())
-          if summary.get('test_result') != 'PASS':
+          if summary.get('format') != 'evidect-runtime-handoff-demo/2' or summary.get('test_result') != 'PASS':
               raise SystemExit('Synthetic handoff did not complete successfully')
-          if not (receiver['format'] == 'evidect-runtime-receiver/1'
+          if not (receiver['format'] == 'evidect-runtime-receiver/2'
                   and receiver['local_status'] == 'VALID'
                   and receiver['overall_status'] == 'INDETERMINATE'
                   and receiver['content_binding']['status'] == 'VALID'
@@ -149,6 +170,15 @@ jobs:
                   and receiver['runtime']['claimed_summaries_match'] is True
                   and len(receiver['runtime']['cases']) == 8):
               raise SystemExit('Unexpected receiver result')
+          check_verification_context(demo, receiver, summary)
+          expected_runtime_checks = {
+              'sender_removed_before_verification': True, 'private_key_in_output': False,
+              'fixed_eight_cases_recomputed': True, 'verification_context_recorded': True,
+              'repeated_verification_evidence_matches': True,
+              'missing_trust_not_adopted': True, 'changed_bytes_rejected': True,
+          }
+          if summary['checks'] != expected_runtime_checks:
+              raise SystemExit('Saved runtime demo checks changed')
           for key in ('report_signed', 'production_observed', 'independent_assessment',
                       'runtime_attestation', 'external_anchor_verified'):
               if receiver[key] is not False:
@@ -161,7 +191,7 @@ jobs:
           routing_receiver = json.loads((routing_demo / 'receiver.json').read_bytes())
           saved_routing_raw = (routing_demo / 'delivery/service-routing-report.json').read_bytes()
           saved_package_raw = (routing_demo / 'delivery/observation.handoff.json').read_bytes()
-          if not (routing_summary['format'] == 'evidect-service-routing-handoff-demo/1'
+          if not (routing_summary['format'] == 'evidect-service-routing-handoff-demo/2'
                   and routing_summary['test_result'] == 'PASS'
                   and routing_summary['routing_report_sha256'] == hashlib.sha256(saved_routing_raw).hexdigest()
                   and routing_summary['handoff_package_sha256'] == hashlib.sha256(saved_package_raw).hexdigest()):
@@ -169,12 +199,14 @@ jobs:
           expected_demo_checks = {
               'sender_removed_before_verification': True, 'private_key_in_output': False,
               'fixed_ten_cases_consistent': True, 'fixed_fixture_expectations_matched': True,
-              'repeated_verification_matches': True, 'missing_trust_not_adopted': True,
+              'verification_context_recorded': True,
+              'repeated_verification_evidence_matches': True, 'missing_trust_not_adopted': True,
               'changed_bytes_rejected': True,
           }
           if routing_summary['checks'] != expected_demo_checks:
               raise SystemExit('Saved routing demo checks changed')
-          if not (routing_receiver['format'] == 'evidect-service-routing-receiver/1'
+          check_verification_context(routing_demo, routing_receiver, routing_summary)
+          if not (routing_receiver['format'] == 'evidect-service-routing-receiver/2'
                   and routing_receiver['local_status'] == 'VALID'
                   and routing_receiver['overall_status'] == 'INDETERMINATE'
                   and routing_receiver['content_binding']['status'] == 'VALID'

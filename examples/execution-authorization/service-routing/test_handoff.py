@@ -149,6 +149,24 @@ class RoutingHandoffTests(unittest.TestCase):
         self.assertEqual(report["control_status"], "NOT_ASSESSED")
         self.assertEqual(report["legal_compliance"], "NOT_ASSESSED")
 
+    def assert_verification(self, report, pin, *, at=None, source="CALLER_SUPPLIED", bounds=None):
+        value = report["verification"]
+        evaluated = value["evaluated_at_unix"]
+        self.assertIs(type(evaluated), int)
+        self.assertGreaterEqual(evaluated, 0)
+        self.assertLessEqual(evaluated, 253402300799)
+        self.assertEqual(value, {
+            "evaluated_at_unix": evaluated, "time_source": source, "clock": "LOCAL_UNATTESTED",
+            "checkpoint_sha256": hashlib.sha256(obs.canonical(pin)).hexdigest() if pin is not None else None,
+            "checkpoint_digest_scope": "CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR",
+            "checkpoint_expires_at_unix": pin["expires_at"] if pin is not None else None,
+            "result_scope": "AS_OF_EVALUATION_TIME", "refresh": "REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST"})
+        if at is not None:
+            self.assertEqual(evaluated, at)
+        if bounds is not None:
+            self.assertLessEqual(bounds[0], evaluated)
+            self.assertLessEqual(evaluated, bounds[1])
+
     def assert_not_adopted(self, report, local_status):
         self.assertEqual(report["local_status"], local_status)
         self.assertEqual(report["overall_status"], "INVALID" if local_status == "INVALID" else "INDETERMINATE")
@@ -160,7 +178,8 @@ class RoutingHandoffTests(unittest.TestCase):
 
     def test_signed_raw_ten_case_roundtrip_retains_all_limits_and_reported_metadata(self):
         report = self.verify()
-        self.assertEqual(report["format"], "evidect-service-routing-receiver/1")
+        self.assertEqual(report["format"], "evidect-service-routing-receiver/2")
+        self.assert_verification(report, self.delivery["pin"], at=self.now)
         self.assertEqual(report["local_status"], "VALID")
         self.assertEqual(report["overall_status"], "INDETERMINATE")
         self.assertEqual(report["content_binding"]["status"], "VALID")
@@ -366,9 +385,16 @@ class RoutingHandoffTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first["local_status"], "VALID")
         self.assertFalse(private.exists())
+        before = int(time.time())
         result = self.cli(*self.cli_args(paths))
+        after = int(time.time())
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), first)
+        received = json.loads(result.stdout)
+        self.assert_verification(received, self.delivery["pin"], source="SYSTEM_CLOCK", bounds=(before, after))
+        expected = copy.deepcopy(first)
+        expected["verification"].update(time_source="SYSTEM_CLOCK",
+                                        evaluated_at_unix=received["verification"]["evaluated_at_unix"])
+        self.assertEqual(received, expected)
         for path, raw in original.items():
             self.assertEqual(path.read_bytes(), raw)
 
@@ -434,7 +460,7 @@ class RoutingHandoffTests(unittest.TestCase):
                  "routing": output / "delivery/service-routing-report.json",
                  "key": output / "test-trust/observer-public.pem", "pin": output / "test-trust/checkpoint.json"}
         pin = json.loads(paths["pin"].read_bytes())
-        self.assertEqual(summary["format"], "evidect-service-routing-handoff-demo/1")
+        self.assertEqual(summary["format"], "evidect-service-routing-handoff-demo/2")
         self.assertEqual(summary["test_result"], "PASS")
         for field in ("report_signed", "production_observed", "independent_assessment",
                       "runtime_attestation", "external_anchor_verified"):
@@ -444,8 +470,10 @@ class RoutingHandoffTests(unittest.TestCase):
         self.assertEqual(summary["checks"], {
             "sender_removed_before_verification": True, "private_key_in_output": False,
             "fixed_ten_cases_consistent": True, "fixed_fixture_expectations_matched": True,
-            "repeated_verification_matches": True, "missing_trust_not_adopted": True, "changed_bytes_rejected": True})
+            "verification_context_recorded": True, "repeated_verification_evidence_matches": True,
+            "missing_trust_not_adopted": True, "changed_bytes_rejected": True})
         self.assertEqual(summary["case_results"], receiver["routing"]["cases"])
+        self.assert_verification(receiver, json.loads(paths["pin"].read_bytes()), source="SYSTEM_CLOCK")
         self.assertEqual(summary["routing_report_sha256"], hashlib.sha256(paths["routing"].read_bytes()).hexdigest())
         self.assertEqual(summary["handoff_package_sha256"], hashlib.sha256(paths["package"].read_bytes()).hexdigest())
         self.assertEqual(summary["checkpoint_expires_at"], pin["expires_at"])
@@ -459,7 +487,10 @@ class RoutingHandoffTests(unittest.TestCase):
         self.assert_limits(receiver)
         repeated = self.cli(*self.cli_args(paths))
         self.assertEqual(repeated.returncode, 0, repeated.stderr)
-        self.assertEqual(json.loads(repeated.stdout), receiver)
+        reread = json.loads(repeated.stdout)
+        self.assert_verification(reread, pin, source="SYSTEM_CLOCK")
+        self.assertEqual({**reread, "verification": {k: v for k, v in reread["verification"].items() if k != "evaluated_at_unix"}},
+                         {**receiver, "verification": {k: v for k, v in receiver["verification"].items() if k != "evaluated_at_unix"}})
         files = {path: path.read_bytes() for path in output.rglob("*") if path.is_file()}
         for path, raw in files.items():
             self.assertFalse(path.is_symlink())
@@ -468,6 +499,81 @@ class RoutingHandoffTests(unittest.TestCase):
         existing = subprocess.run(command, cwd=REPO, capture_output=True, text=True, timeout=15)
         self.assertNotEqual(existing.returncode, 0)
         self.assertEqual({path: path.read_bytes() for path in output.rglob("*") if path.is_file()}, files)
+
+
+    def test_checkpoint_expiry_boundary_does_not_refresh_a_saved_verdict(self):
+        expiry = self.delivery["pin"]["expires_at"]
+        before = adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                         self.delivery["pin"], now=expiry - 1)
+        snapshot = copy.deepcopy(before)
+        self.assertEqual(before["local_status"], "VALID")
+        self.assert_verification(before, self.delivery["pin"], at=expiry - 1)
+        with patch.object(adapter, "_recompute", side_effect=AssertionError("No untrusted semantic recomputation")):
+            for moment in (expiry, expiry + 1):
+                report = adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                                  self.delivery["pin"], now=moment)
+                self.assert_not_adopted(report, "INDETERMINATE")
+                self.assertEqual(report["overall_status"], "INDETERMINATE")
+                self.assertEqual(report["content_binding"]["status"], "NOT_CHECKED")
+                self.assertEqual(report["package_sha256"], before["package_sha256"])
+                self.assert_verification(report, self.delivery["pin"], at=moment)
+        self.assertEqual(before, snapshot)
+
+    def test_evaluation_time_is_sampled_once_and_used_for_authentication(self):
+        expiry = self.delivery["pin"]["expires_at"]
+        with patch.object(adapter.time, "time", side_effect=[expiry - 0.25, expiry + 2]) as clock, \
+                patch.object(legacy, "verify_package", wraps=legacy.verify_package) as verified:
+            report = adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                             self.delivery["pin"])
+        clock.assert_called_once_with()
+        self.assertEqual(verified.call_count, 1)
+        self.assertEqual(verified.call_args.kwargs["now"], expiry - 1)
+        self.assertEqual(report["local_status"], "VALID")
+        self.assert_verification(report, self.delivery["pin"], at=expiry - 1, source="SYSTEM_CLOCK")
+
+    def test_checkpoint_identity_is_canonical_and_not_a_trust_anchor(self):
+        pin = self.delivery["pin"]
+        reordered = dict(reversed(list(pin.items())))
+        reordered["context"] = dict(reversed(list(pin["context"].items())))
+        first = self.verify()
+        same = adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                       reordered, now=self.now)
+        self.assertEqual(same, first)
+        extended = {**pin, "expires_at": pin["expires_at"] + 1}
+        changed = adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                          extended, now=self.now)
+        self.assertEqual(changed["local_status"], "VALID")
+        self.assertNotEqual(changed["verification"]["checkpoint_sha256"], first["verification"]["checkpoint_sha256"])
+        self.assertEqual(changed["package_sha256"], first["package_sha256"])
+        captured = copy.deepcopy(pin)
+        selected = copy.deepcopy(pin)
+        original_verify = legacy.verify_package
+        def mutate_caller(raw, public, owned, *, now):
+            self.assertIsNot(owned, selected)
+            selected["expires_at"] = self.now
+            selected["context"]["generation"] += 1
+            return original_verify(raw, public, owned, now=now)
+        with patch.object(legacy, "verify_package", side_effect=mutate_caller):
+            copied = adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                             selected, now=self.now)
+        self.assertEqual(copied["local_status"], "VALID")
+        self.assert_verification(copied, captured, at=self.now)
+
+    def test_invalid_time_rejected_before_authentication(self):
+        with patch.object(legacy, "verify_package", side_effect=AssertionError("No authentication")), \
+                patch.object(adapter, "_recompute", side_effect=AssertionError("No worker")):
+            for moment in (True, 1.0, -1, 253402300800, float("nan"), float("inf"), "invalid"):
+                with self.subTest(explicit=repr(moment)):
+                    with self.assertRaises(adapter.RoutingHandoffError) as raised:
+                        adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                                self.delivery["pin"], now=moment)
+                    self.assertEqual((raised.exception.code, raised.exception.exit_code),
+                                     ("INVALID_VERIFICATION_TIME", 2))
+            for moment in (True, None, -0.25, float("nan"), float("inf"), "invalid"):
+                with self.subTest(system=repr(moment)), patch.object(adapter.time, "time", return_value=moment):
+                    with self.assertRaises(adapter.RoutingHandoffError):
+                        adapter.verify_delivery(self.delivery["package"], self.routing_bytes, self.key["publicKey"],
+                                                self.delivery["pin"])
 
 
 if __name__ == "__main__":

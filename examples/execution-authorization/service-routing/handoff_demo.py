@@ -19,7 +19,7 @@ REPO = HERE.parents[2]
 _spec = importlib.util.spec_from_file_location("routing_handoff_demo_adapter", HERE / "handoff.py")
 adapter = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(adapter)
-FORMAT = "evidect-service-routing-handoff-demo/1"
+FORMAT = "evidect-service-routing-handoff-demo/2"
 MAX_CHILD_OUTPUT = 512 * 1024
 FIXTURE_CALLS = (1, 0, 0, 0, 1, 2, 1, 2, 0, 1)
 KEYGEN = """
@@ -130,6 +130,34 @@ def check_receiver(report):
     return routing["cases"]
 
 
+def check_verification(report, checkpoint, before, after):
+    """Check the saved evaluation context against retained trust and this local CLI call."""
+    require(type(report) is dict, "VERIFICATION_CONTEXT_INVALID")
+    verification = report.get("verification")
+    fields = {"evaluated_at_unix", "time_source", "clock", "checkpoint_sha256", "checkpoint_digest_scope",
+              "checkpoint_expires_at_unix", "result_scope", "refresh"}
+    require(type(verification) is dict and set(verification) == fields, "VERIFICATION_CONTEXT_INVALID")
+    evaluated = verification["evaluated_at_unix"]
+    require(type(evaluated) is int and 0 <= evaluated <= 253402300799
+            and before <= evaluated <= after and evaluated < checkpoint["expires_at"], "VERIFICATION_TIME_MISMATCH")
+    require(type(verification["checkpoint_expires_at_unix"]) is int, "VERIFICATION_EXPIRY_INVALID")
+    expected = {
+        "time_source": "SYSTEM_CLOCK", "clock": "LOCAL_UNATTESTED",
+        "checkpoint_sha256": hashlib.sha256(adapter.obs.canonical(checkpoint)).hexdigest(),
+        "checkpoint_digest_scope": "CANONICAL_CHECKPOINT_JSON_NOT_TRUST_ANCHOR",
+        "checkpoint_expires_at_unix": checkpoint["expires_at"],
+        "result_scope": "AS_OF_EVALUATION_TIME", "refresh": "REVERIFY_ORIGINAL_INPUTS_WITH_CURRENT_TRUST",
+    }
+    require({key: value for key, value in verification.items() if key != "evaluated_at_unix"} == expected,
+            "VERIFICATION_CONTEXT_MISMATCH")
+
+
+def without_evaluation_time(report):
+    """Preserve every other result field without changing either saved result."""
+    return {**report, "verification": {key: value for key, value in report["verification"].items()
+                                      if key != "evaluated_at_unix"}}
+
+
 def run(output):
     adapter.obs.platform_check()
     require(sys.version_info >= (3, 10), "PYTHON_3_10_REQUIRED")
@@ -188,16 +216,24 @@ def run(output):
         put_bytes(public_path, public_key.encode("ascii"))
         put_bytes(checkpoint_path, encode(checkpoint))
     require(not sender.exists(), "SENDER_CLEANUP_FAILED")
+    retained_checkpoint = adapter.auth.read_json(checkpoint_path)
+    require(retained_checkpoint == checkpoint, "RETAINED_CHECKPOINT_CHANGED")
 
     common = [sys.executable, "-I", "-B", str(HERE / "handoff.py"), "verify", "--package", str(package_path),
               "--routing-report", str(routing_path)]
     selected_trust = ["--trusted-public-key", str(public_path), "--checkpoint", str(checkpoint_path)]
+    before = int(time.time())
     raw_receiver = invoke(common + selected_trust, env)
+    after = int(time.time())
     receiver = adapter.obs.strict_json(raw_receiver)
     cases = check_receiver(receiver)
+    check_verification(receiver, retained_checkpoint, before, after)
     put_bytes(target / "receiver.json", raw_receiver)
+    before = int(time.time())
     repeat = adapter.obs.strict_json(invoke(common + selected_trust, env))
-    require(repeat == receiver, "REPEATED_VERIFICATION_CHANGED")
+    after = int(time.time())
+    check_verification(repeat, retained_checkpoint, before, after)
+    require(without_evaluation_time(repeat) == without_evaluation_time(receiver), "REPEATED_VERIFICATION_CHANGED")
     missing = adapter.obs.strict_json(invoke(common + ["--checkpoint", str(checkpoint_path)], env, expected=2))
     require(missing["local_status"] == "INDETERMINATE" and missing["routing"]["status"] == "NOT_RECOMPUTED",
             "MISSING_TRUST_WAS_PROMOTED")
@@ -213,7 +249,8 @@ def run(output):
     summary = {"format": FORMAT, "test_result": "PASS", "first_party_synthetic": True,
                "checks": {"sender_removed_before_verification": True, "private_key_in_output": False,
                           "fixed_ten_cases_consistent": True, "fixed_fixture_expectations_matched": True,
-                          "repeated_verification_matches": True, "missing_trust_not_adopted": True,
+                          "verification_context_recorded": True,
+                          "repeated_verification_evidence_matches": True, "missing_trust_not_adopted": True,
                           "changed_bytes_rejected": True},
                "case_results": cases,
                "node": node_version, "python": sys.version.split()[0], "git_revision": revision,
@@ -229,6 +266,7 @@ def run(output):
                          "signatures, historical authority, request-route binding and nonce use are not reverified. "
                          "Reported tool state and synthetic route labels do not establish actual execution or provider identity. "
                          "Source hashes and local cleanup do not attest runtime integrity or secure erasure. "
+                         "The saved result is as of its recorded local evaluation time and does not update itself. "
                          "Recheck original delivery with separately selected current trust; the checkpoint expires."}
     put_bytes(target / "summary.json", encode(summary))
     return summary
