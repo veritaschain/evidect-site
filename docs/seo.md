@@ -8,7 +8,7 @@ Google Trends was inspected directly in the browser with Japan, web search, all 
 
 | Comparison | Observed result | Editorial decision |
 | --- | --- | --- |
-| [脆弱性 / 脆弱性診断 / サイバー攻撃](https://trends.google.com/trends/explore?date=today%2012-m&geo=JP&q=脆弱性,脆弱性診断,サイバー攻撃&hl=ja) | Displayed averages: 5 / 0 / 3. The week beginning October 18 showed 100 / 0 / 30. Rising searches included `php 脆弱 性 対応` and `php 脆弱 性 問題`, marked breakout. | Connect PHP advisory readers to the existing support page. Do not promote a production vulnerability assessment or certification service that has not launched. |
+| [脆弱性 / 脆弱性診断 / サイバー攻撃](https://trends.google.com/trends/explore?date=today%2012-m&geo=JP&q=脆弱性,脆弱性診断,サイバー攻撃&hl=ja) | Displayed averages: 5 / 0 / 3. The week beginning October 18 showed 100 / 0 / 30. Rising searches included `php 脆弱 性 対応` and `php 脆弱 性 問題`, marked breakout. | Keep the notice pages focused on official sources, observation limits, recipient correction and stopping notices. Do not add paid-service calls to action to those pages. The separate support page can describe the services that are actually offered. |
 | [PHP 脆弱性 / PHP 更新 / WordPress 更新 / WordPress 保守](https://trends.google.com/trends/explore?date=today%2012-m&geo=JP&q=PHP%20脆弱性,PHP%20更新,WordPress%20更新,WordPress%20保守&hl=ja) | Displayed averages: 2 / 0 / 0 / 0. October 18: 100 / 3 / 1 / 0. The PHP vulnerability spike compresses the other series. | Use `PHPの脆弱性対応` in visible support copy and descriptive metadata where the service actually supports updates. Avoid extrapolating a long-term market size from an incident spike. |
 | [PHP 更新 / WordPress 更新 / WordPress 保守 / WordPress 復旧](https://trends.google.com/trends/explore?date=today%2012-m&geo=JP&q=PHP%20更新,WordPress%20更新,WordPress%20保守,WordPress%20復旧&hl=ja) | Displayed averages: 3 / 4 / 0 / 0 after excluding the much larger vulnerability term. WordPress updates have recurring observations. | Prioritize updates in the support title and heading. Keep recovery and maintenance because they describe actual services, without claiming measured demand from zero-valued series. |
 
@@ -53,3 +53,9 @@ Submit `https://evidect.veritaschain.org/sitemap.xml` to the verified Search Con
 - [Google: introduction to structured data](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data)
 - [Google: organization markup](https://developers.google.com/search/docs/appearance/structured-data/organization)
 - [Google: localized page versions](https://developers.google.com/search/docs/specialty/international/localized-versions)
+
+## Notice-page separation — 1 November 2026
+
+The Japanese and English security-notice pages do not link directly to paid support, service offers or the certification concept. The Japanese paid-support call to action has been removed. Both pages explain observation limits and provide a stop/correction contact. The support page no longer uses a political figure's social-media post alongside service pricing.
+
+These are website-content changes. They do not establish that previously sent email met applicable rules, that a mail suppression list exists, or that any existing sending process has been updated. The operator must apply stop requests to its actual sending records before further delivery; this repository contains no mail-delivery or suppression backend.
