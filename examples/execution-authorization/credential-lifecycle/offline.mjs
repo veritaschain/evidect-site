@@ -33,13 +33,27 @@ function dataOptions(raw, allowed) {
 export function createCredentialEvidence(raw) {
   const { contextId, reports, providerAudit } = dataOptions(raw, ['contextId', 'reports', 'providerAudit']);
   need(identifier(contextId));
-  const values = snapshot(reports);
-  need(Array.isArray(values) && values.length <= 64);
-  const attempts = values.map(report => {
-    need(report?.format === 'evidect-credential-lifecycle-attempt/2');
-    return Object.fromEntries(ATTEMPT_FIELDS.map(field =>
-      [field, field === 'reported_execution' ? report.execution : report[field]]));
-  });
+  need(!isProxy(reports) && Array.isArray(reports) && Object.getPrototypeOf(reports) === Array.prototype && reports.length <= 64);
+  need(Reflect.ownKeys(reports).length === reports.length + 1);
+  const attempts = [];
+  for (let index = 0; index < reports.length; index++) {
+    const entry = Object.getOwnPropertyDescriptor(reports, String(index));
+    need(entry?.enumerable && Object.hasOwn(entry, 'value'));
+    const report = entry.value;
+    need(report !== null && typeof report === 'object' && !isProxy(report) &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(report)));
+    const fields = Reflect.ownKeys(report);
+    need(fields.length <= 32 && fields.every(field => typeof field === 'string' && field.length <= 80));
+    record(report, fields); // Reject top-level accessors even on unselected fields.
+    need(Object.getOwnPropertyDescriptor(report, 'format')?.value === 'evidect-credential-lifecycle-attempt/2');
+    // Each report also holds cumulative, cached observations. Do not traverse
+    // that unrelated history before selecting the original evidence fields.
+    attempts.push(Object.fromEntries(ATTEMPT_FIELDS.map(field => {
+      const descriptor = Object.getOwnPropertyDescriptor(report, field === 'reported_execution' ? 'execution' : field);
+      need(descriptor && Object.hasOwn(descriptor, 'value'));
+      return [field, descriptor.value];
+    })));
+  }
   // No credential input, private key, oracle counter or cached VALID result is copied.
   return { format: EVIDENCE_FORMAT, context_id: contextId,
     attempts: snapshot(attempts), provider_observation: snapshot(providerAudit) };

@@ -203,6 +203,30 @@ class WitnessTests(unittest.TestCase):
             clock = iter((10.0, end))
             result = self.check(monotonic=lambda: next(clock))
             self.assertEqual((result["local_status"], result["witness_reason"]), ("INDETERMINATE", "WITNESS_ROUND_TRIP_EXPIRED"))
+            self.assertEqual(result["round_trip_ms"], (end - 10.0) * 1000)
+            json.dumps(result, allow_nan=False)
+
+    def assert_unrepresentable_duration_preserves_verdict(self, end):
+        for conflict in (False, True):
+            with self.subTest(known_conflict=conflict):
+                self.local.selected["generation"] = 1 if conflict else 2
+                clock = iter((0.0, end))
+                result = self.check(monotonic=lambda: next(clock))
+                expected = "INVALID" if conflict else "INDETERMINATE"
+                reason = "RECEIVER_BEHIND_WITNESS" if conflict else "WITNESS_DURATION_CLOCK_INVALID"
+                self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                                 (expected, expected, expected))
+                self.assertEqual(result["witness_reason"], reason)
+                self.assertIsNotNone(result["signed_witness_response"])
+                self.assertIsNone(result["round_trip_ms"])
+                encoded = json.dumps(result, allow_nan=False)
+                self.assertEqual(json.loads(encoded), result)
+
+    def test_finite_clock_overflow_has_serializable_result(self):
+        self.assert_unrepresentable_duration_preserves_verdict(1e308)
+
+    def test_finite_duration_outside_json_safe_range_has_serializable_result(self):
+        self.assert_unrepresentable_duration_preserves_verdict(1e13)
 
     def test_invalid_duration_clock_fails_closed(self):
         for value in (True, float("nan"), float("inf"), -1):
@@ -235,7 +259,9 @@ class WitnessTests(unittest.TestCase):
     def test_known_witness_conflict_survives_timeout(self):
         self.local.selected["generation"] = 1
         clock = iter((10.0, 100.0))
-        self.assertEqual(self.check(monotonic=lambda: next(clock))["local_status"], "INVALID")
+        result = self.check(monotonic=lambda: next(clock))
+        self.assertEqual(result["local_status"], "INVALID")
+        self.assertEqual(result["round_trip_ms"], 90000)
 
     def test_repeated_live_checks_have_new_challenges(self):
         queries = []

@@ -100,6 +100,88 @@ test('producer cached verdicts are never substituted for recomputed evidence che
   assert.equal(check(value, { evidence: forged }).overall_status, 'INVALID', 'Unknown cached fields are not evidence schema');
 });
 
+test('producer selects 64 signed attempts before bounding the exported evidence', () => {
+  const fixture = createFixture(), reports = [];
+  for (let index = 0; index < 64; index++) {
+    const input = fixture.input(credentialOperation({ credentialRef: 'capacity-parent-' + index }));
+    // The fixture's inspect() has a separate cumulative-history budget. This
+    // regression exercises execution and evidence creation, not that view.
+    const report = fixture.runner.execute(input);
+    assert.equal(report.execution, 'COMPLETED');
+    reports.push(report);
+  }
+  const { evidence, trust } = pack(fixture, reports);
+  const scope = { evidence, trust, expectedContextId: trust.contextId,
+    expectedRequestDigests: reports.map(report => report.request_digest) };
+  const result = check(scope);
+  consistent(result);
+  assert.equal(evidence.attempts.length, 64);
+  assert.equal(result.inventory.supplied_unique_count, 64);
+  assert.ok(result.attempts.every(attempt => attempt.status === 'VALID'));
+
+  // A full batch must keep the final original signature available for checking;
+  // truncation or trusting cached flags would hide this last-item contradiction.
+  const changedLast = clone(reports.at(-1));
+  flipSignature(changedLast.signed_inputs.request);
+  const changed = pack(fixture, [...reports.slice(0, -1), changedLast]).evidence;
+  const rejected = check(scope, { evidence: changed });
+  assert.equal(changed.attempts.length, 64);
+  assert.equal(rejected.attempts.length, 64);
+  assert.equal(rejected.attempts[63].request_signature.status, 'INVALID');
+  assert.equal(rejected.overall_status, 'INVALID');
+  limitations(rejected);
+  assert.throws(() => pack(fixture, [...reports, reports[0]]), TypeError);
+});
+
+test('producer rejects non-data report containers without invoking callers', () => {
+  const value = scenario();
+  let calls = 0;
+  const trap = () => { calls++; throw new Error('CALLER_CODE_EXECUTED'); };
+  const hooks = { get: trap, getPrototypeOf: trap, ownKeys: trap, getOwnPropertyDescriptor: trap };
+  const arrayGetter = [value.report];
+  Object.defineProperty(arrayGetter, '0', { enumerable: true, get: trap });
+  const tooMany = Array(65);
+  Object.defineProperty(tooMany, '0', { enumerable: true, get: trap });
+  const extra = [value.report]; extra.extra = true;
+  const hidden = [value.report]; Object.defineProperty(hidden, '0', { enumerable: false });
+  const differentPrototype = Object.setPrototypeOf([value.report], Object.create(Array.prototype));
+  for (const reports of [new Proxy([value.report], hooks), arrayGetter, tooMany, extra, hidden, differentPrototype, Array(1)]) {
+    assert.throws(() => pack(value.fixture, reports), TypeError);
+    assert.equal(calls, 0);
+  }
+  for (const field of ['format', 'signed_inputs', 'provider_observation']) {
+    const report = { ...value.report };
+    Object.defineProperty(report, field, { enumerable: true, get: trap });
+    assert.throws(() => pack(value.fixture, [report]), TypeError);
+    assert.equal(calls, 0);
+  }
+  assert.throws(() => pack(value.fixture, [new Proxy(value.report, hooks)]), TypeError);
+  const missing = { ...value.report }; delete missing.signed_inputs;
+  assert.throws(() => pack(value.fixture, [missing]), TypeError);
+  assert.equal(calls, 0);
+});
+
+test('producer omits unselected nested histories while bounding selected data', () => {
+  const value = scenario();
+  let calls = 0;
+  const report = { ...value.report,
+    provider_observation: Array.from({ length: 256 }, () => Array(100).fill(null)),
+    provider_correlation: { get status() { calls++; return 'VALID'; } } };
+  const evidence = pack(value.fixture, [report]).evidence;
+  assert.deepEqual(evidence, value.evidence);
+  assert.equal(calls, 0, 'Unused nested history must neither execute nor enter the evidence');
+
+  const selectedGetter = { ...value.report, signed_inputs: { ...value.report.signed_inputs } };
+  Object.defineProperty(selectedGetter.signed_inputs, 'request', { enumerable: true, get() { calls++; return value.input.request; } });
+  assert.throws(() => pack(value.fixture, [selectedGetter]), TypeError);
+  const selectedProxy = { ...value.report, signed_inputs: new Proxy(value.report.signed_inputs,
+    { get() { calls++; throw new Error('CALLER_CODE_EXECUTED'); } }) };
+  assert.throws(() => pack(value.fixture, [selectedProxy]), TypeError);
+  assert.throws(() => pack(value.fixture, [{ ...value.report, collector_evidence: report.provider_observation }]), TypeError,
+    'The original 20,000-node snapshot budget still applies to selected evidence');
+  assert.equal(calls, 0);
+});
+
 test('request payload or signature changes are detected even when producer flags still say VALID', () => {
   const value = scenario();
   for (const change of [

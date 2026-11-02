@@ -30,6 +30,9 @@ receiptの観測対象は次の固定3ファイルです。各ファイルは1 M
 
 これらは元の`offline-demo.mjs`が生成する`evidence.json`・`trust.json`・`expectation.json`をコピーしたものです。
 元の3入力CLIの各2 MiB上限と、この接続経路の各1 MiB上限は別です。
+[要求・鍵の件数上限と判定理由](CONTRACT.md#input-count-limits)は、この経路でも適用されます。
+この受取経路で読む入力は通常ファイルかつリンク数1に限ります。最終パス要素がsymlinkの入力と、
+複数のhardlinkを持つファイルは受け付けません。
 原envelopeには署名対象の`instruction`本文が含まれます。一般入力から秘密を除去する機能ではありません。
 このfixtureには実資格情報を入れず、credentialの生値と試験用秘密鍵を公開出力へ保存しません。
 

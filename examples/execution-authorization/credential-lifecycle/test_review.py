@@ -129,6 +129,83 @@ class CredentialReviewTests(unittest.TestCase):
         self.assertEqual(len(value["attempts"]), 5)
         self.assertTrue(all(attempt["status"] == "VALID" for attempt in value["attempts"]))
 
+    def test_sixty_four_signed_attempts_survive_receiver_witness_and_five_file_export(self):
+        program = """
+import {createFixture, credentialOperation} from './fixtures.mjs';
+import {createCredentialEvidence, EXPECTATION_FORMAT} from './offline.mjs';
+const fixture = createFixture(), reports = [];
+for (let index = 0; index < 64; index++) {
+  const report = fixture.runner.execute(fixture.input(credentialOperation({credentialRef: 'parent-' + index})));
+  if (report.execution !== 'COMPLETED') throw new Error('SYNTHETIC_ATTEMPT_NOT_COMPLETED');
+  reports.push(report);
+}
+const trust = fixture.exportTrust();
+const evidence = createCredentialEvidence({contextId: trust.contextId, reports,
+  providerAudit: fixture.providerOwned.provider.observe()});
+const expectation = {format: EXPECTATION_FORMAT, contextId: trust.contextId,
+  requestDigests: reports.map(report => report.request_digest)};
+process.stdout.write(JSON.stringify({evidence, trust, expectation}));
+"""
+        generated = subprocess.run(["node", "--input-type=module", "-e", program], cwd=HERE,
+                                   capture_output=True, timeout=40, check=True)
+        self.assertEqual(generated.stderr, b"")
+        inputs = {name: f.encode(value) for name, value in json.loads(generated.stdout).items()}
+        self.assertEqual(set(inputs), {"evidence", "trust", "expectation"})
+        self.assertTrue(all(0 < len(raw) <= f.handoff.MAX_FILE_BYTES for raw in inputs.values()))
+        lab = f.Lab(self.root, inputs, self.receipt_key, self.witness_key)
+        delivery = lab.delivery()
+        for adopted in lab.adopt_pair(delivery):
+            self.assertEqual(adopted["local_status"], "VALID")
+        before = lab.databases()
+        for corrupted in (False, True):
+            with self.subTest(last_signature_corrupted=corrupted):
+                selected = dict(delivery)
+                if corrupted:
+                    evidence = json.loads(delivery["evidence"])
+                    evidence["attempts"][-1]["signed_inputs"]["request"]["signature"] = "0" * 128
+                    selected["evidence"] = f.encode(evidence)
+                source = lab.verify(selected)
+                offline = source["receiver"]["receiver"]["credential"]
+                self.assertEqual(offline["status"], "REVERIFIED")
+                self.assertEqual(len(offline["result"]["attempts"]), 64)
+                expected = "INVALID" if corrupted else "VALID"
+                self.assertEqual(offline["result"]["attempts"][-1]["request_signature"]["status"], expected)
+                self.assertEqual(source["local_status"], expected)
+                destination = self.root / ("maximum-invalid" if corrupted else "maximum-valid")
+                manifest = review.write_review(destination, source, "verify-witness")
+                self.assertEqual({path.name for path in destination.iterdir()}, FILES)
+                self.assertEqual(json.loads((destination / "verification.json").read_bytes()), source)
+                projected = json.loads((destination / "review.json").read_bytes())
+                self.assertEqual(len(projected["attempts"]), 64)
+                self.assertEqual(projected["inventory"]["expected_count"], 64)
+                self.assert_headline(projected, expected, "INVALID" if corrupted else "INDETERMINATE")
+                for name, entry in manifest["files"].items():
+                    raw = (destination / name).read_bytes()
+                    self.assertEqual(entry, {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+                self.assertEqual(lab.databases(), before)
+
+    def test_unrepresentable_witness_durations_remain_reviewable_with_known_conflicts(self):
+        lab = f.Lab(self.root, self.inputs, self.receipt_key, self.witness_key)
+        delivery = lab.delivery(); lab.adopt_pair(delivery)
+        backup = lab.store.path.read_bytes()
+        for conflict in (False, True):
+            if conflict:
+                lab.adopt_pair(lab.delivery(2, evidence=delivery["evidence"] + b"\n"))
+                lab.store.path.write_bytes(backup)
+            for end in (1e308, 1e13):
+                with self.subTest(known_conflict=conflict, end=end):
+                    ticks = iter((0.0, end))
+                    source = f.witness.verify(lab.store, lab.adapter_for(delivery), lab.stream, f.KIND,
+                        delivery["package"], delivery["evidence"], lab.selected_trust(), lab.transport(),
+                        clock=lambda: lab.now, monotonic=lambda: next(ticks))
+                    expected = "INVALID" if conflict else "INDETERMINATE"
+                    self.assertEqual(source["witness_reason"], "RECEIVER_BEHIND_WITNESS" if conflict
+                                     else "WITNESS_DURATION_CLOCK_INVALID")
+                    self.assertIsNone(source["round_trip_ms"])
+                    self.assertIsNotNone(source["signed_witness_response"])
+                    self.assertEqual(json.loads(f.encode(source)), source)
+                    self.assert_headline(review.build_review(source, "verify-witness"), expected, expected)
+
     def test_receiver_rollback_does_not_promote_nested_valid_signatures_or_receipt(self):
         self.assertEqual(self.rollback["receiver"]["receiver"]["credential"]["result"]["evidence_consistency"], "VALID")
         value = review.build_review(self.rollback, "verify-witness")

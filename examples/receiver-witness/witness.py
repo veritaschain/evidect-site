@@ -241,7 +241,12 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
                 raise WitnessError("RECEIVER_SIGNER_REVOKED", "INVALID")
             raise WitnessError("RECEIVER_STATE_CHANGED")
         ended = _elapsed(monotonic)
-        duration = (ended - started) * 1000
+        measured = (ended - started) * 1000
+        # Injected finite clocks can overflow during conversion to milliseconds.
+        # Retain only values accepted by strict JSON result consumers.
+        if abs(measured) > MAX_INT or not math.isfinite(measured):
+            raise WitnessError("WITNESS_DURATION_CLOCK_INVALID")
+        duration = measured
         if ended < started or duration > expected["max_round_trip_ms"]:
             raise WitnessError("WITNESS_ROUND_TRIP_EXPIRED")
         finished = base.sample_time(clock)

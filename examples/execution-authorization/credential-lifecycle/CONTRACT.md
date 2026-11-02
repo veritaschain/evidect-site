@@ -157,6 +157,22 @@ It does not independently establish historical authorization state, trusted UTC 
 `historical_authorization` remains `NOT_ASSESSED`; current collector freshness, provider authenticity,
 log completeness and aggregate-pack authenticity remain `NOT_ESTABLISHED`.
 
+### Input count limits
+
+The standalone and connected verifiers apply the following count limits separately from their
+file-size limits. For otherwise well-formed inputs that reach these checks, the diagnostics are:
+
+| Input | Count limit | Diagnostic when the limit is not met |
+| --- | --- | --- |
+| Evidence `attempts` | At most 64 | `context_binding`: `INVALID` / `MALFORMED_OR_UNSUPPORTED_EVIDENCE` |
+| Expected `requestDigests` | 1–64 unique digests | `RECEIVER_EXPECTATION_UNAVAILABLE`; the expected inventory is not adopted |
+| Trust `issuerKeys` and `approverKeys` | At most 16 entries each | `trust_material`: `INDETERMINATE` / `TRUST_INPUT_PARTIALLY_UNAVAILABLE` |
+
+These diagnostics identify unsupported evidence or unavailable selected configuration; they do not
+by themselves establish a signature mismatch. An empty evidence list does not establish a successful
+verification, and a known contradiction elsewhere still makes the result `INVALID`. Do not remove
+requests from the receiver-adopted inventory merely to fit a limit or make the supplied evidence match.
+
 ## Assurance and exclusions
 
 `test_result: PASS` means the fixed scenario expectations matched. Negative controls intentionally
