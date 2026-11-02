@@ -18,6 +18,7 @@ MAX_DB_BYTES = 8 * 1024 * 1024
 LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/+-]{0,127}\Z")
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 LABELS = ("service", "environment", "release", "scope", "policy_revision")
+KINDS = ("runtime", "routing", "credential")
 SCHEMA = (
     "CREATE TABLE meta (id INTEGER PRIMARY KEY CHECK(id=1), store_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0))",
     "CREATE TABLE streams (stream TEXT PRIMARY KEY, kind TEXT NOT NULL, generation INTEGER NOT NULL, lineage TEXT NOT NULL, checkpoint TEXT NOT NULL, digest TEXT NOT NULL, public_key TEXT NOT NULL)",
@@ -67,7 +68,7 @@ def checkpoint(value):
 
 
 def identity(stream, kind):
-    if type(stream) is not str or not LABEL.fullmatch(stream) or kind not in ("runtime", "routing"):
+    if type(stream) is not str or not LABEL.fullmatch(stream) or kind not in KINDS:
         raise StateError("STREAM_IDENTITY_INVALID")
 
 

@@ -12,7 +12,14 @@
 - `test_witness.py`：実際の署名を使う契約テスト。既存受取処理と保存状態はstubとして明示。
 - `test_integration.py`：既存8/10ケースの署名付き証拠と、二つのSQLite DBを使う接続テスト。
 
-両DBの作成・採用・失効には、既存の`examples/receiver-state/receiver.py`の管理者操作を使います。witnessが受信した要求を根拠に、鍵・checkpoint・世代を自動採用する処理はありません。
+runtime/routingでは、両DBの作成・採用・失効に既存の`examples/receiver-state/receiver.py`の管理者操作を使います。
+credential経路の採用は専用CLIを使い、作成・失効は同じ既存CLIを使います。witnessが受信した要求を根拠に、鍵・checkpoint・世代を自動採用する処理はありません。
+
+[credential用の追加経路](../execution-authorization/credential-lifecycle/WITNESS.md)は、同じ照合処理に
+3入力オフライン再検証を接続します。3入力の元bytesをreceiptへ束縛し、credential用の専用CLIで
+受領者とwitnessの採用状態を照合します。witnessが照合するのは保存された選択であり、
+credentialの効果やprovider記録を独立に検証するものではありません。元の3入力CLIやruntime/routingの
+手順は置き換えず、receipt・witnessの署名domainと既存checkpoint形式も維持します。
 
 ## 新しい照合で確認すること
 

@@ -4,7 +4,7 @@
 
 この実験は、[既存の実行認可gate](../README.md)を再利用し、資格情報の発行・取得・使用・失効と、
 collectorの受領・応答を対応付けます。要求・承認・collector応答には実際のEd25519署名を使います。
-実際に変更するのは試験プロセス内の合成状態だけです。実AWS、モデルAPI、本番アカウント、
+資格情報の操作で変更するのは合成providerの状態だけです。実AWS、モデルAPI、本番アカウント、
 実秘密情報、外部ネットワークは使用しません。
 
 事件との関係と出典は[SOURCES.md](SOURCES.md)、入力・信頼境界は[CONTRACT.md](CONTRACT.md)にあります。
@@ -13,7 +13,8 @@ collectorの受領・応答を対応付けます。要求・承認・collector�
 ## 実行
 
 レビューしたソースのコミットを記録し、リポジトリのルートから実行します。
-Node.js 22系、追加npmパッケージ・APIキー不要です。
+以下の単独実験はNode.js 22系で動き、追加npmパッケージ・APIキーは不要です。
+受領者の保存状態とwitnessを使う追加経路は、[WITNESS.md](WITNESS.md)を参照してください。
 
 ```sh
 git rev-parse HEAD
@@ -56,7 +57,7 @@ collectorが署名するのは要求に対応する受領・照合応答です�
 | 観測ログが不足 | 照合に必要な範囲が未確定 | 操作がなかったこと、課金・流出がなかったこと |
 
 この合成fixtureは資格情報の生値をレポートへ保存しません。参照IDは秘密の値そのものや、
-秘密値の単純hashではありません。試験用秘密鍵も実行ごとに生成し、出力しません。
+秘密値の単純hashではありません。lifecycle fixtureの試験用秘密鍵も実行ごとに生成し、出力しません。
 署名付き入力を保持するときは`instruction`本文も含まれます。メモリ破棄は安全消去の証明ではありません。
 
 操作前の資格情報状態は`credential_precheck`、providerの作用後の状態は
@@ -192,22 +193,31 @@ demoの`harness_provider_oracle`は、試験を採点するcontrollerの私有�
 相関とオフライン再検証は`correlation.test.mjs`と`offline.test.mjs`で別に検査します。
 テストとdemoケースは重なる検証を含むため、単純に合算して独立試験数とはしません。
 
-## witnessとの関係
+## 受領者の記憶とwitnessへの追加接続
 
-[既存receiver-witness実験](../../receiver-witness/README.md)は、受取側DBだけの巻き戻しと、
-両DBの同時巻き戻しを別に試験しています。後者の結果は`both_stores_rollback: NOT_DETECTED`です。
+[追加の受領経路](WITNESS.md)は、evidence・trust・expectationの元bytesを既存の署名付きreceiptへ束縛し、
+受領者が明示的に採用したcheckpointとreceipt署名者の公開鍵を使って再検証します。
+その後、別DBのwitnessへ新しいチャレンジを送り、採用状態を照合できます。
+元の3入力オフラインCLIと旧18ケースのdemoは、この追加経路を自動で呼び出しません。
 
-**今回の資格情報reportをreceiver-witnessへ接続する処理は未実装です。**
-このREADMEから参照するだけで、reportが署名済みEvidence Packになったり、独立したwitnessで保護されたりはしません。
-受取側が選ぶ信頼情報・採用状態・鍵の保護、独立した管理境界を設計した後の別段階です。
+追加経路でも、trustと期待inventoryは受領者が別途選ぶ入力です。DBに保存するのはreceipt署名者の鍵と
+checkpointであり、credentialの生値や実行許可ではありません。receiptが3入力のdigestを束縛しても、
+provider記録の真実性・履歴全体の完全性・pack全体の真正性が成立するわけではありません。
+
+受領者DBだけが古い場合と、両DBを同時に戻した場合を区別します。両DBの同時巻き戻しは
+`both_stores_rollback: NOT_DETECTED`のままです。witnessは別のローカル子プロセス・DB・署名鍵を使いますが、
+同じOSユーザー・管理主体の実験です。今回のwitness応答の成立を、現在のcollectorの鮮度や独立運用の証明へ
+読み替えません。総合判定は`INVALID`または`INDETERMINATE`です。
 
 ## CIと残る範囲
 
 [credential-lifecycle CI](../../../.github/workflows/credential-lifecycle.yml)はUbuntu 24.04とmacOS 15、
-Node.js 22でlifecycle・相関・オフライン再検証と既存gateのテストを実行します。旧demoの18ケースに加え、
-5要求のオフライン用資料を生成し、別プロセスのCLIで再検証します。
-テストログ、report、生成したevidence・trust・expectation、再検証結果、実際にcheckoutしたcommitと
-ソース・生成ファイルのhashを含むinventoryを14日間保存します。
+Node.js 22とPython 3.12でlifecycle・相関・オフライン再検証・既存gateと、追加の受領/witness経路を試験します。
+旧demoの18ケースに加え、5要求のオフライン用資料を生成し、別プロセスのCLIで再検証します。
+受領/witness用の固定合成demoも実行し、保存状態と署名応答を使う経路を別に確認します。
+テストログ、report、生成したevidence・trust・expectation、再検証結果、受領/witness demoの公開用出力、
+実際にcheckoutしたcommitと、依存する受領・witness・receipt処理を含むソースおよび生成ファイルのhashを
+inventoryとともに14日間保存します。試験用秘密鍵や作業DBは保存対象に含めません。
 workflowの追加とCI実行成功は別です。対象PRのheadに対応したrunで結果を確認してください。
 
 reportとCI inventoryは未署名です。`production_observed`と`independent_assessment`は`false`、
@@ -222,9 +232,14 @@ It separates operation binding, collector acknowledgement, fresh challenge verif
 credential state, gate marker calls, and mock-provider attempts and effects. Parent revocation,
 derived-session survival, direct provider use, missing observations, and partial failures remain
 distinct outcomes. All components and keys are controlled by one local harness. No live provider,
-production identity, independent collector, witness integration, or legal compliance is established.
+production identity, independent collector or witness operation, or legal compliance is established.
 Passing tests mean the expected bounded outcomes occurred, including negative controls.
 Opt-in retention includes the original signed request and approval payloads, including instruction text,
 but excludes credential token values and private keys. Offline verification uses separately supplied
 trust and expected scope; it does not establish current authority, fresh monitoring or the truth and
 completeness of unsigned provider observations.
+
+The optional receiver/witness path binds the exact three offline inputs to an existing signed receipt
+and explicitly adopted receiver state. A fresh witness response compares local saved selections;
+it does not make stored collector evidence current or authenticate unsigned provider history.
+Both-store rollback remains an undetected negative control.

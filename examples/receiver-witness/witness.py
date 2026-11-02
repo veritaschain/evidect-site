@@ -23,6 +23,7 @@ QUERY = "evidect-witness-query/1"
 RESPONSE = "evidect-witness-response/1"
 TRUST = "evidect-witness-trust/1"
 FORMAT = "evidect-witness-receiver/1"
+KINDS = ("runtime", "routing", "credential")
 _base = None
 
 
@@ -86,7 +87,7 @@ def integer(value, minimum=0):
 def query(raw):
     value = parse(raw)
     exact(value, ("format", "nonce", "stream", "kind", "package_sha256", "report_sha256"))
-    if value["format"] != QUERY or value["kind"] not in ("runtime", "routing") or not matches(LABEL, value["stream"]) or not all(
+    if value["format"] != QUERY or value["kind"] not in KINDS or not matches(LABEL, value["stream"]) or not all(
             matches(HEX, value[key]) for key in ("nonce", "package_sha256", "report_sha256")):
         raise WitnessError("WITNESS_QUERY_INVALID", "INVALID")
     return value
@@ -139,7 +140,7 @@ def snapshot(store, stream, kind):
 def validate_snapshot(value):
     exact(value, ("store_id", "revision", "kind", "generation", "checkpoint_sha256", "signer_fingerprint", "revoked"))
     if not matches(STORE_ID, value["store_id"]) or not integer(value["revision"]) or not integer(value["generation"], 1) or not (
-            value["kind"] in ("runtime", "routing") and type(value["revoked"]) is bool and
+            value["kind"] in KINDS and type(value["revoked"]) is bool and
             matches(HEX, value["checkpoint_sha256"]) and matches(HEX, value["signer_fingerprint"])):
         raise WitnessError("WITNESS_SNAPSHOT_INVALID", "INVALID")
 

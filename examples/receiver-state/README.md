@@ -15,6 +15,13 @@
 - `revoke`は公開鍵fingerprintをローカルで失効扱いにします。このDBには失効取消し操作を設けていません。別の鍵への更新は、別途選択した鍵で検証できる、より新しい世代の採用として扱います。
 - 検証後に新しい読取りトランザクションで状態を再確認します。途中で状態が変われば`INDETERMINATE`、使用鍵が失効していれば`INVALID`です。証拠自体の既知の不一致は`INVALID`を維持します。
 
+[credential用の追加受領経路](../execution-authorization/credential-lifecycle/WITNESS.md)も、この保存層を使います。
+専用の`receive.py`は、元のevidence・別途選んだtrust・期待inventoryの3入力を署名付きreceiptと対応付け、
+原署名と整合性を再検証します。保存するのはreceipt署名者の公開鍵とcheckpointです。
+3入力そのものやproviderの真正性をDBへの保存で証明するものではありません。
+credential経路の採用・検証には専用CLIを使い、`init`・`revoke`は本CLIを使います。
+SQLiteの保存形式、既存checkpoint形式、runtime/routingの手順は変更しません。
+
 `stream`は受取側が決める名前です。未信頼の入力からstreamを選んだり、都合よく別streamを作成してはいけません。service・environment・scope・policy_revisionが異なるものは、同じstreamへ混在できません。
 
 ## 再現手順
@@ -55,7 +62,7 @@ python3 -I -B examples/receiver-state/receiver.py revoke \
 
 終了コードは`0`がこのローカル検証の`VALID`、`1`が既知の不一致・失効等の`INVALID`、`2`が証拠・状態・検証手段の不足等の`INDETERMINATE`です。未設定・破損・ロック中・失われたDBを空の成功状態へ自動復旧しません。
 
-上位レポートは`evidect-stateful-receiver/1`。元の`receiver/2`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
+上位レポートは`evidect-stateful-receiver/1`。runtime/routingの元の`receiver/2`、またはcredential用の`evidect-credential-receiver/1`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
 
 **DB全体の巻き戻し、同じOSユーザーや管理者による改変、失われたDBの正当な復旧、世界全体の最新世代、独立した時刻証明は扱いません。** 保存されたDBそのものが古い状態へ戻れば、世代と失効記録も一緒に戻ります。これを負の対照として試験します。ローカル時計の検証中の後退は検出しますが、過去に設定された時計や外部時刻とのずれは検出できません。
 
@@ -71,3 +78,4 @@ python3 -I -B examples/receiver-state/test_integration.py -v
 前者は保存・policyとstubを使った制御経路の試験です。暗号検証の試験とは区別します。後者は既存の8/10ケースを実行し、実際に署名したreceiptを使って、保存・再起動相当の再接続・旧世代の拒否・鍵失効・新鍵への更新・改変データ拒否を確認します。合成実験であって、第三者による独立実装ではありません。
 
 実装上の参考：SQLiteの[トランザクションと読み取りsnapshot](https://www.sqlite.org/lang_transaction.html)、Pythonの[sqlite3](https://docs.python.org/3/library/sqlite3.html)。
+

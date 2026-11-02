@@ -20,9 +20,16 @@ StateError, Store = state.StateError, state.Store
 PATHS = {"runtime": "examples/runtime-boundaries/handoff.py",
          "routing": "examples/execution-authorization/service-routing/handoff.py"}
 FORMAT = "evidect-stateful-receiver/1"
+ADAPTER_FORMATS = {"runtime": "evidect-runtime-receiver/2",
+                   "routing": "evidect-service-routing-receiver/2",
+                   "credential": "evidect-credential-receiver/1"}
 
 
 def load_adapter(kind):
+    if kind == "credential":
+        # This kind requires separately selected credential trust and inventory.
+        # Its dedicated CLI supplies an explicitly configured adapter instance.
+        raise StateError("CREDENTIAL_ADAPTER_REQUIRES_SELECTED_TRUST")
     if type(kind) is not str or kind not in PATHS:
         raise StateError("STREAM_IDENTITY_INVALID")
     spec = importlib.util.spec_from_file_location("evidect_stateful_" + kind, REPO / PATHS[kind])
@@ -43,8 +50,7 @@ def sample_time(clock):
 
 def _invoke(adapter, package, report, public_key, pin, now, kind):
     result = adapter.verify_delivery(package, report, public_key, pin, now=now)
-    if type(result) is not dict or result.get("format") != "evidect-" + (
-            "runtime" if kind == "runtime" else "service-routing") + "-receiver/2":
+    if kind not in ADAPTER_FORMATS or type(result) is not dict or result.get("format") != ADAPTER_FORMATS[kind]:
         raise StateError("RECEIVER_CONTRACT_CHANGED")
     if result.get("local_status") not in ("VALID", "INVALID", "INDETERMINATE") or result.get("overall_status") not in ("INVALID", "INDETERMINATE"):
         raise StateError("RECEIVER_CONTRACT_CHANGED")

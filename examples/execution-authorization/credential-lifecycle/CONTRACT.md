@@ -108,7 +108,7 @@ signed request does not authenticate that metadata or establish the completeness
 Correlation reports `CONSISTENT`, `INVALID` or `INDETERMINATE`. A unique audit-only match after a lost
 response is labeled `OBSERVATION_ONLY`; it does not change `FAILED_EFFECT_POSSIBLE` into successful execution.
 
-## Retained inputs and offline verification
+## Retained inputs and standalone offline verification
 
 `retainSignedInputs` defaults to false. The synthetic fixture explicitly enables it to retain the
 original request and approval envelopes: their payload, key identifier and signature. This includes
@@ -167,11 +167,52 @@ Request and collector signatures do not sign the aggregate report. The report re
 production observation, independent assessment, and external anchoring remain unestablished.
 Operational controls and legal compliance remain `NOT_ASSESSED`.
 
-Collector, broker, gate, provider, test state, and signing keys share a process and controller.
-There is no OS isolation or independent administration. A compromised controller can fabricate
-consistent state and signatures. Signing those observations does not make them true or complete.
+Within the lifecycle fixture, collector, broker, gate, provider, test state, and signing keys share
+a process and controller. There is no OS isolation or independent administration. A compromised
+controller can fabricate consistent state and signatures. Signing those observations does not make them true or complete.
 
-The existing receiver-witness implementation is referenced for its separately tested rollback
-limits. It is not wired to this report. No witness nonce, independent checkpoint, or trusted
-timestamp is inferred from a successful credential case. The existing simultaneous-rollback
-negative control must not be presented as detected by this experiment.
+The optional [receiver/witness path](WITNESS.md) is separate from the standalone three-input CLI
+and the original lifecycle scenarios. It uses the existing receipt signature, checkpoint and witness
+formats; it does not introduce a normative VAP/VCP format or change their signature domains.
+The standalone result retains `witness_integrated: false`. A successful connected check does not
+promote the offline result's authenticity, freshness or authorization fields.
+
+## Optional receiver state and witness connection
+
+The connected adapter receives the selected credential trust and expectation bytes separately.
+An existing signed observation receipt binds the exact bytes of `lifecycle-evidence.json`,
+`lifecycle-trust.json` and `lifecycle-expectation.json`. Each connected input is limited to 1 MiB;
+the standalone offline CLI retains its separate 2 MiB limit. A valid receipt alone cannot replace
+reverification of the original request, approval and collector envelopes.
+
+The operator explicitly adopts the receipt signer's public key and checkpoint into receiver state.
+The checkpoint commits to the receipt that binds all three inputs. The database does not adopt
+credential issuer, approver or collector keys directly from arriving evidence, and it does not
+store credential token values. The selected credential trust and expectation remain separate inputs
+whose exact bytes must match the receipt. Neither a receipt nor the demo's generated trust files
+substitute for the receiver's decision to adopt those keys and that expected scope.
+
+The context-specific scope is `credential-context-` followed by SHA-256 of the `contextId` UTF-8 bytes.
+It is part of the existing checkpoint lineage. A higher generation cannot rebind the same stream to
+a different credential context. Revocation in this receiver database applies to the receipt signer;
+it is not provider credential revocation or automatic revocation of every embedded signing key.
+
+The connected receiver rechecks the offline material, its exact-byte receipt binding and the
+currently selected receiver state. Witness verification adds one receiver-generated live challenge
+and compares the witness's saved selection. The witness signs its snapshot and the query binding;
+it does not receive or independently reverify the credential evidence body. A saved response replay
+cannot establish a new live witness exchange. The witness's new nonce does not establish freshness
+of the recorded collector exchange or continuous availability of either component.
+
+Verification is read-only: it cannot adopt a checkpoint, reset missing state, revoke a key, issue a
+credential, invoke a provider or approve execution. Missing witness state, lag, timeout or concurrent
+state changes cannot fall back to local success. Known evidence or state contradictions remain
+`INVALID`. A fully matching local check still has `overall_status: INDETERMINATE`.
+
+The witness uses a separate local database, child process and signing key under the same OS user
+and controller. The fixed test transport is not an independent host or authenticated production
+service. Receiver-only rollback can be detected against a newer witness selection; simultaneous
+rollback of both stores remains `both_stores_rollback: NOT_DETECTED`. Witness compromise, false
+statements, split views, after-response changes and global latest state remain unestablished.
+The receiver and witness result reports remain unsigned; signing the scoped receipt and witness
+response does not independently authenticate the provider history or the aggregate evidence pack.
