@@ -3,7 +3,11 @@ on:
   pull_request:
     paths:
       - 'methodology/**'
+      - 'support/**'
       - 'assets/css/**'
+      - 'assets/js/**'
+      - 'index.html'
+      - 'privacy/**'
       - 'docs/OBSERVATION_REPRODUCTION.md'
       - 'tests/**'
       - 'seo.json'
@@ -13,7 +17,11 @@ on:
     branches: [main]
     paths:
       - 'methodology/**'
+      - 'support/**'
       - 'assets/css/**'
+      - 'assets/js/**'
+      - 'index.html'
+      - 'privacy/**'
       - 'docs/OBSERVATION_REPRODUCTION.md'
       - 'tests/**'
       - 'seo.json'
@@ -32,3 +40,5 @@ jobs:
           persist-credentials: false
       - name: Validate new entrypoint and existing site regressions
         run: python3 -I -B -m unittest discover -s tests -v
+      - name: Validate analytics consent boundaries
+        run: node --test tests/analytics.test.cjs
