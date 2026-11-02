@@ -147,7 +147,7 @@ class Store:
             yield db
         except StateError:
             raise
-        except (OSError, sqlite3.Error, ValueError, TypeError, IndexError):
+        except (OSError, sqlite3.Error, ValueError, TypeError, IndexError, RecursionError):
             raise StateError("STATE_UNAVAILABLE") from None
         finally:
             if db is not None:

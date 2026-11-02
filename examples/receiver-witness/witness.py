@@ -63,8 +63,14 @@ def parse(raw):
         return result
     def constant(_):
         raise WitnessError("WITNESS_NUMBER_INVALID", "INVALID")
+    def finite_float(text):
+        value = float(text)
+        if not math.isfinite(value):
+            raise WitnessError("WITNESS_NUMBER_INVALID", "INVALID")
+        return value
     try:
-        return json.loads(raw.decode("utf-8", "strict"), object_pairs_hook=pairs, parse_constant=constant)
+        return json.loads(raw.decode("utf-8", "strict"), object_pairs_hook=pairs,
+                          parse_constant=constant, parse_float=finite_float)
     except (UnicodeError, ValueError, RecursionError) as error:
         if isinstance(error, WitnessError):
             raise

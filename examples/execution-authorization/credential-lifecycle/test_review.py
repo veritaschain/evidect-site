@@ -371,6 +371,34 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
                 self.assertEqual(lab.databases(), after_actions[0])
                 self.assertEqual(first, inputs)
 
+    def test_overflowing_witness_numbers_remain_invalid_in_saved_review(self):
+        for name, token in (("positive", b"1e999"), ("negative", b"-1e999")):
+            with self.subTest(number=name):
+                directory = self.root / ("witness-overflow-" + name)
+                directory.mkdir(mode=0o700)
+                lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+                delivery = lab.delivery(); lab.adopt_pair(delivery)
+                before, inputs = lab.databases(), copy.deepcopy(delivery)
+                transport, queries = lab.transport(), []
+
+                def exchange(query):
+                    queries.append(query)
+                    response = json.loads(transport(query))
+                    response["payload"]["nonce"] = "__OVERFLOWING_NUMBER__"
+                    return f.encode(response).replace(b'"__OVERFLOWING_NUMBER__"', token, 1)
+
+                source = lab.verify(delivery, exchange=exchange)
+                self.assertEqual((source["local_status"], source["witness_status"], source["witness_reason"]),
+                                 ("INVALID", "INVALID", "WITNESS_NUMBER_INVALID"))
+                self.assertEqual(source["receiver"]["local_status"], "VALID")
+                self.assertEqual(len(queries), 1)
+                self.assertEqual(source["query_sha256"], f.witness.digest(queries[0]))
+                self.assertIsNone(source["signed_witness_response"])
+                self.assertIsNone(source["round_trip_ms"])
+                self.assert_witness_failure_export(directory / "review", source, "INVALID", "WITNESS_NUMBER_INVALID")
+                self.assertEqual(lab.databases(), before)
+                self.assertEqual(delivery, inputs)
+
     def test_local_scope_conflict_during_witness_reads_keeps_invalid_source_and_saved_review(self):
         for phase in ("after_base", "after_response", "final_clock"):
             with self.subTest(phase=phase):
@@ -456,7 +484,14 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
             def select(self, *args, **kwargs):
                 reads.append(1)
                 if len(reads) == 2:
-                    if state_failure is not None:
+                    if state_failure == "deep-json":
+                        # Explicit fixture corruption after the adapter result;
+                        # the read-only verifier must not repair this database.
+                        with sqlite3.connect(lab.store.path) as db:
+                            db.execute("UPDATE streams SET checkpoint=? WHERE stream=?",
+                                       ("[" * 10000 + "0" + "]" * 10000, lab.stream))
+                        actions.append(lab.databases())
+                    elif state_failure is not None:
                         raise f.receiver.StateError("SENSITIVE_FINAL_STATE_FAILURE", state_failure)
                     if revoke:
                         lab.store.revoke(delivery["pin"]["key_fingerprint"])
@@ -493,7 +528,7 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
             self.assertIsNone(source["signed_witness_response"])
         expected = "INVALID" if bad_signature or state_failure == 1 or revoke else "INDETERMINATE"
         reason = ("KEY_REVOKED" if revoke else "FINAL_STATE_INVALID" if state_failure == 1 else
-                  "FINAL_STATE_UNAVAILABLE" if state_failure == 2 else "LOCAL_CLOCK_UNAVAILABLE")
+                  "FINAL_STATE_UNAVAILABLE" if state_failure in (2, "deep-json") else "LOCAL_CLOCK_UNAVAILABLE")
         self.assertEqual((source["local_status"], source["overall_status"]), (expected, expected))
         self.assertEqual(state["state_reason"], reason)
         self.assertEqual(state["evaluated_at_unix"], lab.now)
@@ -509,6 +544,7 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
         manifest = review.write_review(destination, source, mode)
         self.assertEqual({path.name for path in destination.iterdir()}, FILES)
         raw_source = (destination / "verification.json").read_bytes()
+        self.assertEqual(raw_source, (json.dumps(source, ensure_ascii=True, indent=2, allow_nan=False) + "\n").encode("ascii"))
         self.assertEqual(json.loads(raw_source), source)
         self.assertNotIn(b"SENSITIVE_", raw_source)
         projected = json.loads((destination / "review.json").read_bytes())
@@ -525,9 +561,16 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
         for filename, entry in manifest["files"].items():
             raw = (destination / filename).read_bytes()
             self.assertEqual(entry, {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
-        self.assertEqual(lab.databases(), actions[0] if revoke else before_db)
-        self.assertEqual(len(actions), 1 if revoke else 0)
+        changed_state = revoke or state_failure == "deep-json"
+        self.assertEqual(lab.databases(), actions[0] if changed_state else before_db)
+        self.assertEqual(len(actions), 1 if changed_state else 0)
         self.assertEqual(delivery, original_inputs)
+
+    def test_deep_state_json_failure_preserves_completed_receipt_result_and_export(self):
+        for mode in ("verify-local", "verify-witness"):
+            for bad_signature in (False, True):
+                with self.subTest(mode=mode, bad_signature=bad_signature):
+                    self.assert_final_failure_export(mode, bad_signature=bad_signature, state_failure="deep-json")
 
     def test_final_clock_failure_keeps_adopted_receipt_diagnostics_and_unknown_completion(self):
         for mode in ("verify-local", "verify-witness"):

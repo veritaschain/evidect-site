@@ -212,6 +212,40 @@ class IntegrationTests(unittest.TestCase):
                 self.assertIsNone(result["completed_at_unix"])
                 self.assertEqual(self.store.path.read_bytes(), after_actions[0])
 
+    def test_deep_final_checkpoint_retains_completed_signature_verdict(self):
+        deep = "[" * 10000 + "0" + "]" * 10000
+        for kind in self.adapters:
+            delivery = self.delivery(kind)
+            invalid = json.loads(delivery["package"])
+            invalid["signature"]["signature"] = "0" * 128
+            for evidence_status in ("VALID", "INVALID"):
+                with self.subTest(kind=kind, evidence=evidence_status):
+                    self.store = receiver.Store.create(self.base / (kind + "-deep-" + evidence_status))
+                    self.adopt(kind, delivery)
+                    after_actions, checked_results = [], []
+                    def verify_then_corrupt(*args, **kwargs):
+                        checked = self.adapters[kind].verify_delivery(*args, **kwargs)
+                        self.assertEqual(checked["local_status"], evidence_status)
+                        checked_results.append(checked)
+                        with sqlite3.connect(self.store.path) as db:
+                            db.execute("UPDATE streams SET checkpoint=?", (deep,))
+                        after_actions.append(self.store.path.read_bytes())
+                        return checked
+                    samples = iter((self.now, self.now + 1))
+                    result = receiver.verify(self.store, SimpleNamespace(verify_delivery=verify_then_corrupt),
+                        kind, kind, delivery["package"] if evidence_status == "VALID" else encode(invalid),
+                        delivery["report"], clock=lambda: next(samples))
+                    expected = "INVALID" if evidence_status == "INVALID" else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["state_reason"], "FINAL_STATE_UNAVAILABLE")
+                    self.assertEqual(len(checked_results), 1)
+                    self.assertIs(result["receiver"], checked_results[0])
+                    self.assertEqual((result["evaluated_at_unix"], result["completed_at_unix"]), (self.now, self.now + 1))
+                    self.assertEqual(result["generation"], 1)
+                    self.assertLessEqual(len(after_actions[0]), receiver.state.MAX_DB_BYTES)
+                    self.assertEqual(self.store.path.read_bytes(), after_actions[0])
+                    json.dumps(result, allow_nan=False)
+
     def test_independently_loaded_store_retains_signed_result_on_final_read_failure(self):
         spec = importlib.util.spec_from_file_location("independent_signed_state_contract", HERE / "state.py")
         independent = importlib.util.module_from_spec(spec)

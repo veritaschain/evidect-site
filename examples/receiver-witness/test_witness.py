@@ -180,6 +180,67 @@ class WitnessTests(unittest.TestCase):
             with self.subTest(raw=raw[:20]):
                 self.assertNotEqual(self.check(lambda _: raw)["local_status"], "VALID")
 
+    def test_nonfinite_json_numbers_in_queries_and_responses_are_invalid(self):
+        request = self.request()
+        response = self.reply(request)
+        marker = "__witness_test_number__"
+        query_template = self.request(nonce=marker)
+        for token in (b"NaN", b"Infinity", b"-Infinity", b"1e999", b"-1e999"):
+            with self.subTest(query_number=token):
+                raw_query = query_template.replace(w.encode(marker), token)
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.query(raw_query)
+                self.assertEqual((caught.exception.status, caught.exception.code),
+                                 ("INVALID", "WITNESS_NUMBER_INVALID"))
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.check_response(raw_query, response, self.trust)
+                self.assertEqual((caught.exception.status, caught.exception.code),
+                                 ("INVALID", "WITNESS_NUMBER_INVALID"))
+            for field in ("format", "witness_id", "query_sha256", "nonce", "stream"):
+                with self.subTest(response_field=field, response_number=token):
+                    envelope = json.loads(response)
+                    envelope["payload"][field] = marker
+                    raw_response = w.encode(envelope).replace(w.encode(marker), token)
+                    with self.assertRaises(w.WitnessError) as caught:
+                        w.check_response(request, raw_response, self.trust)
+                    self.assertEqual((caught.exception.status, caught.exception.code),
+                                     ("INVALID", "WITNESS_NUMBER_INVALID"))
+                    result = self.check(lambda _: raw_response)
+                    self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                                     ("INVALID", "INVALID", "INVALID"))
+                    self.assertEqual(result["witness_reason"], "WITNESS_NUMBER_INVALID")
+                    self.assertEqual(result["receiver"]["local_status"], "VALID")
+                    self.assertIsNone(result["signed_witness_response"])
+        # Finite floats still reach the existing field and signature checks.
+        for token in (b"1.5", b"1e308", b"1e-999"):
+            with self.subTest(finite_number=token):
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.query(query_template.replace(w.encode(marker), token))
+                self.assertEqual(caught.exception.code, "WITNESS_QUERY_INVALID")
+                envelope = json.loads(response)
+                envelope["payload"]["snapshot"]["generation"] = marker
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.check_response(request, w.encode(envelope).replace(w.encode(marker), token), self.trust)
+                self.assertEqual(caught.exception.code, "WITNESS_SNAPSHOT_INVALID")
+                envelope = json.loads(response)
+                envelope["payload"]["nonce"] = marker
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.check_response(request, w.encode(envelope).replace(w.encode(marker), token), self.trust)
+                self.assertEqual(caught.exception.code, "WITNESS_SIGNATURE_INVALID")
+
+    def test_crypto_helper_nonfinite_numbers_stay_unavailable(self):
+        for operation, field in (("sign", "signature"), ("verify", "valid")):
+            for token in (b"NaN", b"1e999", b"-1e999"):
+                with self.subTest(operation=operation, number=token):
+                    raw = w.encode({"fingerprint": "a" * 64, field: "__witness_test_number__"})
+                    process = subprocess.CompletedProcess([], 0,
+                        stdout=raw.replace(w.encode("__witness_test_number__"), token), stderr=b"")
+                    with patch.object(w.subprocess, "run", return_value=process):
+                        with self.assertRaises(w.WitnessError) as caught:
+                            w.crypto(operation, {}, self.key["private" if operation == "sign" else "public"], "0" * 128)
+                    self.assertEqual((caught.exception.status, caught.exception.code),
+                                     ("INDETERMINATE", "WITNESS_CRYPTO_UNAVAILABLE"))
+
     def test_query_does_not_accept_checkpoint_key_path_or_nonce_errors(self):
         for field in ("checkpoint", "key", "path", "url"):
             with self.assertRaises(w.WitnessError):
@@ -486,7 +547,8 @@ class WitnessTests(unittest.TestCase):
         self.assertNotEqual(json.loads(queries[0])["nonce"], json.loads(queries[1])["nonce"])
 
     def test_invalid_trust_never_runs_exchange(self):
-        for value in (None, {}, {**self.trust, "max_round_trip_ms": True}, {**self.trust, "max_round_trip_ms": 30001}):
+        for value in (None, {}, {**self.trust, "max_round_trip_ms": True}, {**self.trust, "max_round_trip_ms": 30001},
+                      {**self.trust, "max_round_trip_ms": float("inf")}, {**self.trust, "witness_id": float("-inf")}):
             self.trust = value
             result = self.check(lambda _: self.fail("unusable trust must not make request"))
             self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),

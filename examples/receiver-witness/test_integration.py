@@ -75,6 +75,28 @@ class WitnessIntegrationTests(unittest.TestCase):
                 self.assertEqual(before, [s.path.read_bytes() for s in (self.store, self.witness_store)])
                 self.assertNotIn(b"PRIVATE KEY", self.witness_store.path.read_bytes())
 
+    def test_nonfinite_witness_response_is_invalid_without_changing_either_store(self):
+        for kind in self.adapters:
+            data = self.setup_pair(kind)
+            self.assertEqual(self.verify(kind, data)["local_status"], "VALID")
+            before = [store.path.read_bytes() for store in (self.store, self.witness_store)]
+            for token in (b"1e999", b"-1e999", b"NaN"):
+                with self.subTest(kind=kind, number=token):
+                    def exchange(query):
+                        response = json.loads(self.transport()(query))
+                        response["payload"]["nonce"] = "__witness_test_number__"
+                        return w.encode(response).replace(w.encode("__witness_test_number__"), token)
+                    result = self.verify(kind, data, exchange=exchange)
+                    self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                                     ("INVALID", "INVALID", "INVALID"))
+                    self.assertEqual(result["witness_reason"], "WITNESS_NUMBER_INVALID")
+                    self.assertEqual(result["receiver"]["local_status"], "VALID")
+                    self.assertEqual(result["receiver"]["receiver"][kind]["status"], "RECOMPUTED")
+                    self.assertIsNotNone(result["query_sha256"])
+                    self.assertIsNone(result["signed_witness_response"])
+                    json.dumps(result, allow_nan=False)
+                    self.assertEqual(before, [store.path.read_bytes() for store in (self.store, self.witness_store)])
+
     def test_restored_receiver_database_rejected_by_current_witness_both_kinds(self):
         for kind in self.adapters:
             with self.subTest(kind=kind):

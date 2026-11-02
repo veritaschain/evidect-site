@@ -198,6 +198,32 @@ class StateTests(unittest.TestCase):
             db.execute("UPDATE streams SET digest=?", ("0" * 64,))
         self.assert_code("STATE_CORRUPT", self.store.select, "s", "runtime")
 
+    def test_deep_stored_checkpoint_is_unavailable_before_verification(self):
+        self.adopt()
+        deep = "[" * 10000 + "0" + "]" * 10000
+        with sqlite3.connect(self.store.path) as db:
+            db.execute("UPDATE streams SET checkpoint=?", (deep,))
+            self.assertEqual(db.execute("PRAGMA quick_check(1)").fetchone(), ("ok",))
+        before = self.store.path.read_bytes()
+        self.assertLessEqual(len(before), state.MAX_DB_BYTES)
+        with self.assertRaises(StateError) as caught:
+            self.store.select("s", "runtime")
+        self.assertEqual((caught.exception.code, caught.exception.exit_code), ("STATE_UNAVAILABLE", 2))
+        adapter = AdapterStub()
+        self.assert_code("STATE_UNAVAILABLE", receiver.verify, self.store, adapter, "s", "runtime",
+                         PACKAGE, b"report", clock=lambda: NOW)
+        self.assertEqual(adapter.calls, 0)
+        package, report = self.base / "package", self.base / "report"
+        package.write_bytes(PACKAGE)
+        report.write_bytes(b"report")
+        checked = subprocess.run([sys.executable, "-I", "-B", str(HERE / "receiver.py"), "verify",
+            "--state-dir", str(self.directory), "--stream", "s", "--kind", "runtime",
+            "--package", str(package), "--report", str(report)], capture_output=True, timeout=10)
+        self.assertEqual((checked.returncode, checked.stderr), (2, b""))
+        self.assertEqual(json.loads(checked.stdout), {"format": "evidect-receiver-state-error/1",
+            "error": "STATE_UNAVAILABLE", "local_status": "INDETERMINATE"})
+        self.assertEqual(self.store.path.read_bytes(), before)
+
     def test_state_reads_do_not_write_or_consume(self):
         self.adopt()
         before = self.store.path.read_bytes()
@@ -413,6 +439,39 @@ class StateTests(unittest.TestCase):
                 receiver.verify(store, AdapterStub(), "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
             self.assertIs(caught.exception, error)
             self.assertEqual(store.path.read_bytes(), before)
+
+    def test_independent_store_deep_checkpoint_retains_completed_evidence(self):
+        spec = importlib.util.spec_from_file_location("independent_deep_state_contract", HERE / "state.py")
+        independent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(independent)
+        self.assertIsNot(independent.StateError, StateError)
+        deep = "[" * 10000 + "0" + "]" * 10000
+        for evidence in ("VALID", "INVALID", "INDETERMINATE"):
+            with self.subTest(evidence=evidence):
+                store = independent.Store.create(self.base / evidence)
+                store.adopt("s", "runtime", pin(), PUBLIC, now=NOW)
+                selected = store.select("s", "runtime")
+                after_actions = []
+                def corrupt_checkpoint():
+                    with sqlite3.connect(store.path) as db:
+                        db.execute("UPDATE streams SET checkpoint=?", (deep,))
+                    after_actions.append(store.path.read_bytes())
+                adapter = AdapterStub(evidence, corrupt_checkpoint)
+                samples = iter((NOW, NOW + 1))
+                result = receiver.verify(store, adapter, "s", "runtime", PACKAGE, b"report",
+                                         clock=lambda: next(samples))
+                expected = "INVALID" if evidence == "INVALID" else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["state_reason"], "FINAL_STATE_UNAVAILABLE")
+                self.assertEqual(result["receiver"]["local_status"], evidence)
+                self.assertEqual((result["evaluated_at_unix"], result["completed_at_unix"]), (NOW, NOW + 1))
+                self.assertEqual(result["checkpoint_sha256"], selected["checkpoint_sha256"])
+                self.assertEqual(adapter.calls, 1)
+                with self.assertRaises(independent.StateError) as caught:
+                    store.select("s", "runtime")
+                self.assertEqual((caught.exception.code, caught.exception.exit_code), ("STATE_UNAVAILABLE", 2))
+                self.assertEqual(store.path.read_bytes(), after_actions[0])
+                json.dumps(result, allow_nan=False)
 
     def test_final_clock_failure_preserves_completed_evidence_without_invented_time(self):
         self.adopt()

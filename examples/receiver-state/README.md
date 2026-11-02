@@ -67,6 +67,8 @@ runtime/routingの元adapterが、不正な署名形式等を型付きの入力�
 `ADAPTER_VERIFIER_UNAVAILABLE`・終了コード2です。任意の例外に付いた終了コードやメッセージを
 検証結果として採用しません。adapterが結果を返す前の失敗では、完了済みの内側レポートを作りません。
 この区別は採用前の検証にも適用し、拒否された候補をDBへ保存しません。
+元receiptのJSONでは、数値変換で非有限になる指数表記や、整数変換制限による解析失敗も入力不正として
+扱います。これらを暗号検証器の停止として報告しません。有限値の受理条件は既存の各フィールド検査に従います。
 
 上位レポートは`evidect-stateful-receiver/1`。runtime/routingの元の`receiver/2`、またはcredential用の`evidect-credential-receiver/1`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
 
@@ -76,6 +78,10 @@ runtime/routingの元adapterが、不正な署名形式等を型付きの入力�
 すでに確認した鍵失効等の状態理由があれば、それを優先します。どの場合も既知の`INVALID`を失わせず、
 不足しか判明していない場合は`INDETERMINATE`です。最終時計を取得できなかった結果では
 `completed_at_unix`を`null`とし、開始時刻等で補いません。最終状態の読取り失敗は、最新状態の確認成功を意味しません。
+
+保存されたcheckpointのJSONが深すぎて解析に失敗した場合も、保存層は`STATE_UNAVAILABLE`として返します。
+最初の読取りなら未確定のまま検証を開始せず、完了済みの検証後なら`FINAL_STATE_UNAVAILABLE`と元結果を
+保持します。署名不一致等の既知の`INVALID`は失わせません。DBの修復・初期化は行いません。
 
 ライブラリの`Store.error_type`は、この保存層が返す具体的なエラー型です。別のmoduleとして読み込んだ
 同じ保存層でも、その宣言に従って分類します。試験用のラッパーや独自の保存層を渡す場合は、返す型を

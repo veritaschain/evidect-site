@@ -269,6 +269,18 @@ precedence. Known adapter contradictions and observed signer revocation remain `
 prerequisites alone remain `INDETERMINATE`. When the final clock cannot be sampled,
 `completed_at_unix` is null. A failed final read does not establish current state or freshness.
 
+An excessively nested stored checkpoint that exceeds the JSON decoder's recursion capacity is
+normalized to the existing unavailable-state error. Before verification this remains unresolved;
+after the adapter has completed, `FINAL_STATE_UNAVAILABLE` retains that result and any established
+`INVALID`. The verifier does not repair or recreate the database.
+
+Witness query/response parsing rejects numeric conversions that produce nonfinite values, including
+exponent overflow such as `1e999`, as `INVALID / WITNESS_NUMBER_INVALID`. Malformed output from the
+cryptographic helper remains an unavailable-verifier condition, and malformed selected trust remains
+an unresolved prerequisite. The common receipt parser likewise normalizes nonfinite conversions and
+integer-conversion failures as input errors. Finite values still undergo the existing field checks;
+these parsing corrections do not introduce a new signature encoding or numeric schema.
+
 Additional local state reads during witness verification preserve the store's explicit stream-kind
 contradiction as `INVALID / RECEIVER_STATE_INVALID`, before the query, after response verification,
 or at the final read. Completed inner verification remains available. An already established witness
