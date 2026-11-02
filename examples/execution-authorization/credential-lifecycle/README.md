@@ -209,13 +209,22 @@ provider記録の真実性・履歴全体の完全性・pack全体の真正性�
 同じOSユーザー・管理主体の実験です。今回のwitness応答の成立を、現在のcollectorの鮮度や独立運用の証明へ
 読み替えません。総合判定は`INVALID`または`INDETERMINATE`です。
 
+### 検証実行時点のレポートを保存する
+
+専用CLIの`verify-local`・`verify-witness`には、[任意の`--output NEWDIR`](WITNESS.md#検証結果を保存する)を指定できます。
+元の検証JSONと、読みやすいHTML・Markdown・JSONの派生表示を、新規ディレクトリへ保存します。
+最上位の総合判定を先に示し、内側の`VALID`や`REVERIFIED`を総合成功へ置き換えません。
+未署名で編集可能な保存レポートであり、開き直しても現在のwitnessやcollectorの鮮度は更新されません。
+元のevidence・trust・expectation、署名対象のinstruction、秘密鍵はこの出力へコピーしません。
+
 ## CIと残る範囲
 
 [credential-lifecycle CI](../../../.github/workflows/credential-lifecycle.yml)はUbuntu 24.04とmacOS 15、
 Node.js 22とPython 3.12でlifecycle・相関・オフライン再検証・既存gateと、追加の受領/witness経路を試験します。
 旧demoの18ケースに加え、5要求のオフライン用資料を生成し、別プロセスのCLIで再検証します。
-受領/witness用の固定合成demoも実行し、保存状態と署名応答を使う経路を別に確認します。
-テストログ、report、生成したevidence・trust・expectation、再検証結果、受領/witness demoの公開用出力、
+受領/witness用の固定合成demoに加え、保存レポートのテストと5種類の表示例を実行します。
+上位が未確定・不一致の場合に、内側の一致だけで成功表示にならないことも確認します。
+テストログ、report、生成したevidence・trust・expectation、再検証結果、受領/witness demoと保存表示例の公開用出力、
 実際にcheckoutしたcommitと、依存する受領・witness・receipt処理を含むソースおよび生成ファイルのhashを
 inventoryとともに14日間保存します。試験用秘密鍵や作業DBは保存対象に含めません。
 workflowの追加とCI実行成功は別です。対象PRのheadに対応したrunで結果を確認してください。
@@ -243,3 +252,7 @@ The optional receiver/witness path binds the exact three offline inputs to an ex
 and explicitly adopted receiver state. A fresh witness response compares local saved selections;
 it does not make stored collector evidence current or authenticate unsigned provider history.
 Both-store rollback remains an undetected negative control.
+
+Optional saved review exports preserve the original verification result and put the outer overall status
+ahead of limited inner checks. They are unsigned static views of one run, not fresh witness responses,
+new evidence packages or inputs that can replace the original evidence and receiver-selected trust.

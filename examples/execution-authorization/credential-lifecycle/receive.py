@@ -48,6 +48,7 @@ def _without_state(adapter, package, evidence):
 
 def main(argv=None):
     adapter, package, evidence = None, None, None
+    output_directory, review_mode = None, None
     try:
         values = sys.argv[1:] if argv is None else argv
         flags = [value.split("=", 1)[0] for value in values if value.startswith("--")]
@@ -62,12 +63,16 @@ def main(argv=None):
             if name == "adopt":
                 command.add_argument("--receipt-public-key", required=True)
                 command.add_argument("--checkpoint", required=True)
-            elif name == "verify-witness":
-                for option in ("witness-trust", "witness-test-state-dir", "witness-test-private-key"):
-                    command.add_argument("--" + option, required=True)
+            else:
+                command.add_argument("--output", help="New directory for an unsigned static review of this verification result")
+                if name == "verify-witness":
+                    for option in ("witness-trust", "witness-test-state-dir", "witness-test-private-key"):
+                        command.add_argument("--" + option, required=True)
         args = parser.parse_args(values)
         if any(type(value) is str and not value for value in vars(args).values()):
             raise base.StateError("EMPTY_ARGUMENT")
+        if args.command != "adopt":
+            output_directory, review_mode = args.output, args.command
         base.state.identity(args.stream, "credential")
         # These immutable bytes are selected by the receiver. No package fields
         # choose the files, public keys, expected inventory or stream.
@@ -97,8 +102,20 @@ def main(argv=None):
     except (OSError, ValueError, TypeError, RecursionError, ImportError, AttributeError):
         # Do not emit arbitrary exception strings, input contents or paths.
         result = _failure("INPUT_OR_VERIFIER_UNAVAILABLE", checked=_without_state(adapter, package, evidence))
+    exit_code = {"VALID": 0, "INVALID": 1, "INDETERMINATE": 2}[result["local_status"]]
+    if output_directory is not None:
+        try:
+            # Project this exact in-memory result. Do not rerun verification,
+            # select another checkpoint or issue another witness challenge.
+            review = _load("evidect_credential_review", HERE / "review.py")
+            review.write_review(output_directory, result, review_mode)
+        except (OSError, ValueError, TypeError, RecursionError, ImportError, AttributeError, OverflowError):
+            # Saving and verification are different outcomes. Preserve the
+            # original verdict and any known INVALID even if export fails.
+            print("Review export failed; the verification result is unchanged.", file=sys.stderr)
+            exit_code = 1 if result["local_status"] == "INVALID" else 2
     print(json.dumps(result, ensure_ascii=True, indent=2, allow_nan=False))
-    return {"VALID": 0, "INVALID": 1, "INDETERMINATE": 2}[result["local_status"]]
+    return exit_code
 
 
 if __name__ == "__main__":

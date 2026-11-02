@@ -99,6 +99,45 @@ DBの作成とreceipt署名鍵の失効には、既存の[receiver-state CLI](..
 この伝送は同じOSユーザーのローカル試験用で、独立ホストや本番の認証済み通信ではありません。
 demoが出力する保存資料には、この秘密鍵や稼働中のwitness DBは含まれません。
 
+## 検証結果を保存する
+
+`verify-local`と`verify-witness`の共通引数に`--output NEWDIR`を追加すると、その実行で得た検証結果を
+新規ディレクトリへ保存します。`adopt`では使えません。既存ディレクトリは上書きしません。
+`--output`を付けない場合は、従来どおり元のJSON結果を標準出力へ返します。
+保存処理のためにwitnessへ再度問い合わせたり、providerを呼び出したりはしません。
+
+| 保存ファイル | 内容 |
+|---|---|
+| `verification.json` | 今回の検証で返された元の結果。標準出力の判定と同じ |
+| `review.json` | `evidect-credential-review/1`。総合判定、限定された検査、実施状況、残る保証を分けた派生表示 |
+| `review.html` | ブラウザーで読む静的な日本語レポート |
+| `review.md` | Markdownで読む同じ範囲のレポート |
+| `manifest.json` | `evidect-credential-review-manifest/1`。未署名のファイルhash一覧。照合用であり、信頼の根拠ではない |
+
+この出力に、元のevidence・trust・expectationファイル、署名対象のinstruction本文、秘密鍵はコピーしません。
+ただし、元の検証結果に含まれる識別子は残ります。一般入力からの自動的な秘密除去や暗号化を行う機能ではありません。
+保存レポートは編集可能で、原証拠や認証書の代わりにはなりません。
+
+**表示は、この検証実行時点の記録です。** 表示する時刻は元の結果に記録された受取側の検証開始・完了時刻で、
+witnessを使う経路では照合前の記録です。ローカル時計による未認証の時刻であり、HTMLやMarkdownを後日
+開き直しても状態は更新されません。記録されたwitness応答は新しいlive challengeではなく、現在のwitness・
+collectorの鮮度や継続的な有効性を示しません。再確認には、別途保持した原入力と現在の受領者の採用状態を使います。
+保存した`review.json`や`verification.json`の成功表示を、原入力の検証へ代用するCLIはありません。
+
+保存が成功しても、標準出力の元の検証結果と終了コード0・1・2は変えません。
+保存が失敗した場合も元の判定を標準出力に残し、標準エラーへ固定診断を出します。
+この場合は元の判定が`INVALID`なら終了コード1、それ以外は2です。「保存できた」と「検証条件が一致した」を分けます。
+
+表示用の固定合成例は、リポジトリルートで次のように再現します。
+
+```sh
+python3 -I -B examples/execution-authorization/credential-lifecycle/test_review.py -v
+python3 -I -B examples/execution-authorization/credential-lifecycle/review-demo.py --output credential-review-output
+```
+
+このdemoは5種類の検証結果から、各5ファイルの表示を作ります。未確定・不一致やwitness未実施の表示を含みます。
+表示例の試験成功は、その検証結果が総合的に有効だったことを意味しません。
+
 ## 結果の読み方
 
 内側の`evidect-credential-receiver/1`は、既存の保存状態レポート
@@ -120,8 +159,13 @@ demo summaryの`witness_integrated: true`は、このローカル接続を実行
 終了コードは限定的な`VALID`が0、既知の矛盾による`INVALID`が1です。
 材料・状態・検証手段が不足する場合は2で、不正入力でも既知の矛盾が成立すれば1になります。
 上位の結果が`INVALID`や`INDETERMINATE`なら、内側の`VALID`だけを抜き出して成功にしません。
-UIや結果表示では「提供資料内の整合性」「受領者の採用状態との一致」「今回のwitness保存状態との照合」を
-区別します。いずれも本番認可・実行承認・法令適合の合格表示ではありません。
+UIや結果表示では、最上段の「総合判定」を優先し、その下に元の証拠、receiptと3入力の対応、
+保存状態を含む受取検証、witness照合を分けて表示します。受取検証の層には内側の証拠検査も含まれます。
+総合`INDETERMINATE`は「未確定」、限定された`VALID`は「限定範囲の一致」です。
+全ての限定検査が一致しても、総合の保証が成立するわけではありません。
+`REVERIFIED`は再検証を実行したという実施状況であり、その再検証結果は`INVALID`の場合もあります。
+`verify-local`のwitness欄は未実施として扱い、結果がない項目を成功や0件へ補完しません。
+いずれも本番認可・実行承認・法令適合の合格表示ではありません。
 
 元のオフライン結果は変更せず、`historical_authorization: NOT_ASSESSED`と、現在のcollectorの鮮度、
 provider観測の真正性、ログ全体の完全性、pack全体の真正性の`NOT_ESTABLISHED`を維持します。

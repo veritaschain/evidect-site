@@ -65,8 +65,16 @@ reuses the same gate to bind synthetic credential operations to requests and app
 receipts and fresh challenges, and distinguish gate markers from mock-provider attempts and effects.
 It includes parent revocation with surviving derived sessions, direct provider use outside the gate,
 lost acknowledgements, and observation gaps. Real Ed25519 checks are used, while all authority and
-provider state remain within one trusted local controller. Reports are unsigned, witness integration
-and production identity are not established, and controls and legal compliance remain NOT_ASSESSED.
+provider state remain within one trusted local controller. Reports are unsigned. Production identity
+and independent witness operation are not established; controls and legal compliance remain NOT_ASSESSED.
+
+The optional [receiver/witness path](examples/execution-authorization/credential-lifecycle/WITNESS.md)
+binds the exact evidence, selected trust and expected inventory bytes to a signed observation receipt
+and explicitly adopted receiver state. It compares separate local stores under one controller;
+matching checks leave the overall result INDETERMINATE, and rollback of both stores remains undetected.
+The [saved review reports](examples/execution-authorization/credential-lifecycle/WITNESS.md#検証結果を保存する)
+present that verification run as unsigned HTML, Markdown and JSON. They do not refresh witness state
+when opened or convert a limited local match into production approval.
 
 ```sh
 node --test examples/execution-authorization/credential-lifecycle/lifecycle.test.mjs

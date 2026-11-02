@@ -216,3 +216,37 @@ rollback of both stores remains `both_stores_rollback: NOT_DETECTED`. Witness co
 statements, split views, after-response changes and global latest state remain unestablished.
 The receiver and witness result reports remain unsigned; signing the scoped receipt and witness
 response does not independently authenticate the provider history or the aggregate evidence pack.
+
+## Optional saved review reports
+
+Only `receive.py verify-local` and `verify-witness` accept `--output NEWDIR`; adoption does not.
+The verifier runs as usual, and the exporter receives that run's in-memory result. It does not
+reverify a supplied result file, repeat a witness exchange, or infer a verdict from a saved success
+label. Without `--output`, the existing command behavior is unchanged.
+
+A successful export creates exactly `verification.json`, `review.json`, `review.html`, `review.md`
+and `manifest.json` in a new directory. `verification.json` preserves the original verification
+result; the review files are derived views. The unsigned manifest records file hashes for byte
+comparison, not trusted provenance. Original evidence/trust/expectation files, request instruction
+text and signing keys are not copied into this report directory. This is not a general redaction
+or encryption service; verification identifiers remain data that the receiver chooses to disclose.
+
+The outer `overall_status` has display priority over every nested result. A local `VALID` means
+agreement within the checked scope, while the overall result remains `INDETERMINATE` unless a
+contradiction makes it `INVALID`. `REVERIFIED` records that a recomputation ran; the recomputed
+`evidence_consistency` can still be `INVALID`. Provider `CONSISTENT`, successful file export,
+`witness_integrated` and scenario `PASS` are not substitutes for a verification verdict. Missing
+components are not filled with `VALID`, zero events or an implied successful witness check.
+
+All saved views describe the verification run, not the time at which a reader opens the file.
+The time is from an unattested local clock. Recorded witness agreement does not become a new
+live challenge, establish current collector freshness, or attest that a saved report remains
+current. Later use requires the original inputs and the receiver's current selection and state.
+The reports and manifest are unsigned and editable; they do not provide independent assessment,
+provider authenticity, full-history completeness, production authorization or legal compliance.
+
+A successful export preserves stdout's original result and the original verification exit code
+0, 1 or 2. An output failure also preserves the stdout verdict, emits a fixed diagnostic to stderr
+and exits 1 if the original result is `INVALID`, otherwise 2. Saving an invalid result successfully
+cannot turn the command into a successful verification; failure to save cannot erase a known
+verification contradiction. Existing output directories are not overwritten.
