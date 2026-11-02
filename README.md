@@ -6,7 +6,7 @@ Independent static GitHub Pages site for `https://evidect.veritaschain.org/`.
 - `/certification/`: proposed assessment of current implementation, change-management roles and operational evidence, newly discovered risks, scope, and certification status.
 - `/services/`: overview of available support and research consultations.
 - `/methodology/`: investigation scope, observations and evidence-design approach.
-- `/support/`: PHP/WordPress support, owner-approved tax-inclusive prices and inquiry form.
+- `/support/`: PHP/WordPress support, tax-inclusive prices and inquiry form.
 - `/notices/` and `/notices/ja/`: English and Japanese security-notice information.
 - `/about/`: operator and project information.
 - `/contact/`: general inquiry form and contact routes.
@@ -19,7 +19,7 @@ Serve locally with `python3 -m http.server 8854`; check with `python3 -m unittes
 
 ## Hosting and migration
 
-GitHub Pages publishes `main` at `/`. Xserver DNS has `evidect CNAME veritaschain.github.io` with TTL 3600. The custom domain and enforced HTTPS were activated in October 2026.
+GitHub Pages publishes `main` at `/` using the custom domain and HTTPS.
 
 The old Japanese URL at `https://veritaschain.org/use-cases/security-research/ja/` uses an immediate HTML/JavaScript redirect that preserves query strings and fragments. This is not an HTTP 301 redirect. Parent-site links and sitemap were updated in `veritaschain/vcp-site#97`.
 
@@ -29,13 +29,13 @@ The research service remains in development and its VAP/OAP/DAP integration rema
 
 ## Support inquiry page
 
-The prices on `/support/` were provided and approved by the owner on 2026-10-22: free initial assessment; PHP/WordPress update JPY 11,000; update-related error support JPY 22,000/hour with the update fee included in a JPY 110,000 total cap; recovery JPY 11,000–110,000; monthly maintenance from JPY 11,000. All prices include tax. Scope, timing, and time calculation are confirmed before paid work.
+The tax-inclusive prices published on `/support/` are: free initial assessment; PHP/WordPress update JPY 11,000; update-related error support JPY 22,000/hour with the update fee included in a JPY 110,000 total cap; recovery JPY 11,000–110,000; monthly maintenance from JPY 11,000. All prices include tax. Scope, timing, and time calculation are confirmed before paid work.
 
 The form uses the existing native POST endpoint `https://formspree.io/f/xblvzzoo`, retaining Formspree verification and a honeypot. Each service link selects the corresponding inquiry category. The fallback email is `security@veritaschain.org`. No mail credentials, admin login, or uploads are requested. Test submissions must be intercepted locally; production delivery and domain allowlist checks remain separate from browser QA.
 
 ## Search metadata
 
-Search titles, descriptions, structured data, icons, social previews and language alternates are maintained in `seo.json` and `scripts/update_seo.py`. See [SEO configuration and Google Trends rationale](docs/seo.md) for the observed queries, update procedure, validation and indexing follow-up.
+Search titles, descriptions, structured data, icons, social previews and language alternates are maintained in `seo.json` and `scripts/update_seo.py`. Edit `seo.json`, run `python3 scripts/update_seo.py`, and validate with `python3 -m unittest discover -s tests -v`. Keep visible prices, descriptions and structured data consistent. Changes to indexing or search rankings are not guaranteed.
 
 ## Experimental observation tools
 
@@ -88,3 +88,9 @@ The receiver binding is a caller-protected choice, not a provider signature over
 The [follow-up extension](examples/retention-evidence-intake/FOLLOWUP.md) binds an explicit receiver owner reference, work deadline and evidence requests to an ordered selection of original inputs. It recomputes the origin and each reassessment, preserves historical review items and compares the latest context and time. Even a newly ready intake leaves the case open for scoped review. Assignments are unsigned receiver declarations; the program sends no notification, schedules no work and makes no control or legal decision.
 
 The [Japanese operator guide](examples/retention-evidence-intake/OPERATOR_GUIDE.md) connects that evidence to an explicit review workflow: prepare the selected inputs, complete a decision draft, sign its exact bytes, separately select the current decision, and regenerate JSON/HTML/Markdown reports. A signed, authorized and current scoped decision can produce `CLOSED_REVIEW`; changed evidence, context, authorization or time boundaries require renewed review. The original dossier remains unchanged. The [decision contract](examples/retention-evidence-intake/DECISION_CONTRACT.md) explains those distinct work states and the protection required for receiver-selected trust, clocks and checkpoints. The [recorded workflow execution](examples/retention-evidence-intake/results/WORKFLOW.md) covers the complete synthetic path and saved-input rechecks; it does not establish production integration or a passing control.
+
+## Website publication correction — 2 November 2026
+
+Homepage analytics now require opt-in; the privacy page provides settings without collecting a page view. The privacy notice identifies jsDelivr, and the methodology page states the permitted public-observation boundary. Internal DNS and approval notes and the SEO strategy memo are removed from the current tree. These changes do not establish past message compliance or implement a mail-suppression backend.
+
+トップページのアクセス解析を同意後に限定し、プライバシーページに設定変更機能とjsDelivrの記載を追加しました。公開情報の観測範囲を明記し、内部向けのDNS・承認記録・SEO戦略メモを現行ツリーから外しました。過去メールの法令適合や送付停止処理の実装を示すものではありません。
