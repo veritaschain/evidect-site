@@ -275,6 +275,42 @@ class StateTests(unittest.TestCase):
                              PACKAGE, b"report", PUBLIC, pin(), clock=lambda: NOW)
         self.assert_code("STREAM_NOT_PROVISIONED", self.store.select, "s", "runtime")
 
+    def test_typed_adapter_errors_keep_classification_without_adopting(self):
+        for kind in ("runtime", "routing"):
+            adapter = receiver.load_adapter(kind)
+            error_type = getattr(adapter, receiver.ADAPTER_ERRORS[kind])
+            self.adopt(stream=kind, kind=kind)
+            before = self.store.path.read_bytes()
+            for exit_code, expected in ((1, "ADAPTER_INPUT_INVALID"), (2, "ADAPTER_VERIFIER_UNAVAILABLE")):
+                for adopting in (False, True):
+                    with self.subTest(kind=kind, exit_code=exit_code, adopting=adopting), \
+                            patch.object(adapter, "verify_delivery", side_effect=error_type("private-adapter-details", exit_code)):
+                        with self.assertRaises(StateError) as caught:
+                            if adopting:
+                                receiver.adopt(self.store, adapter, kind, kind, PACKAGE, b"report", PUBLIC, pin(2), clock=lambda: NOW)
+                            else:
+                                receiver.verify(self.store, adapter, kind, kind, PACKAGE, b"report", clock=lambda: NOW)
+                        self.assertEqual((caught.exception.code, caught.exception.exit_code), (expected, exit_code))
+                        self.assertNotIn("private-adapter-details", str(caught.exception))
+                        self.assertEqual(self.store.path.read_bytes(), before)
+                        self.assertEqual(self.store.select(kind, kind)["generation"], 1)
+
+    def test_unrecognized_adapter_errors_do_not_claim_invalid_by_name_or_exit_code(self):
+        for kind in ("runtime", "routing"):
+            adapter = receiver.load_adapter(kind)
+            self.adopt(stream=kind, kind=kind)
+            before = self.store.path.read_bytes()
+            same_named_type = type(receiver.ADAPTER_ERRORS[kind], (ValueError,), {})
+            for error in (ValueError("private-details"), same_named_type("private-details")):
+                error.exit_code = 1
+                with self.subTest(kind=kind, error_type=type(error)), \
+                        patch.object(adapter, "verify_delivery", side_effect=error):
+                    with self.assertRaises(ValueError) as caught:
+                        receiver.verify(self.store, adapter, kind, kind, PACKAGE, b"report", clock=lambda: NOW)
+                    self.assertIs(caught.exception, error)
+                    self.assertNotIsInstance(caught.exception, StateError)
+                    self.assertEqual(self.store.path.read_bytes(), before)
+
     def test_wrapper_uses_saved_pin_and_keeps_assurance_limits(self):
         receiver.adopt(self.store, AdapterStub(), "s", "runtime", PACKAGE, b"report", PUBLIC, pin(), clock=lambda: NOW)
         result = receiver.verify(self.store, AdapterStub(), "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
@@ -335,6 +371,48 @@ class StateTests(unittest.TestCase):
                         self.assertEqual(adapter.calls, 1)
                         json.dumps(result, allow_nan=False)
         self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_independent_store_error_contract_preserves_completed_evidence(self):
+        spec = importlib.util.spec_from_file_location("independent_state_contract", HERE / "state.py")
+        independent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(independent)
+        self.assertIsNot(independent.StateError, StateError)
+        for evidence in ("VALID", "INVALID"):
+            for unavailable in (False, True):
+                with self.subTest(evidence=evidence, unavailable=unavailable):
+                    store = independent.Store.create(self.base / (evidence + "-" + str(unavailable)))
+                    store.adopt("s", "runtime", pin(), PUBLIC, now=NOW)
+                    saved = store.directory / "unavailable.sqlite3"
+                    after_actions = []
+                    def fail_state():
+                        if unavailable:
+                            store.path.rename(saved)
+                        else:
+                            with sqlite3.connect(store.path) as db:
+                                db.execute("UPDATE streams SET kind='routing'")
+                        after_actions.append((saved if unavailable else store.path).read_bytes())
+                    adapter = AdapterStub(evidence, fail_state)
+                    samples = iter((NOW, NOW + 1))
+                    result = receiver.verify(store, adapter, "s", "runtime", PACKAGE, b"report", clock=lambda: next(samples))
+                    expected = "INVALID" if evidence == "INVALID" or not unavailable else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["state_reason"], "FINAL_STATE_UNAVAILABLE" if unavailable else "FINAL_STATE_INVALID")
+                    self.assertEqual(result["receiver"]["local_status"], evidence)
+                    self.assertEqual((result["evaluated_at_unix"], result["completed_at_unix"]), (NOW, NOW + 1))
+                    self.assertEqual(adapter.calls, 1)
+                    self.assertEqual((saved if unavailable else store.path).read_bytes(), after_actions[0])
+                    if unavailable:
+                        self.assertFalse(store.path.exists())
+        store = independent.Store.create(self.base / "unrecognized-final-read")
+        store.adopt("s", "runtime", pin(), PUBLIC, now=NOW)
+        selected, before = store.select("s", "runtime"), store.path.read_bytes()
+        for error in (ValueError("private-details"), StateError("private-details", 1)):
+            error.exit_code = 1
+            with self.subTest(unrecognized_type=type(error)), \
+                    patch.object(store, "select", side_effect=[selected, error]), self.assertRaises(ValueError) as caught:
+                receiver.verify(store, AdapterStub(), "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
+            self.assertIs(caught.exception, error)
+            self.assertEqual(store.path.read_bytes(), before)
 
     def test_final_clock_failure_preserves_completed_evidence_without_invented_time(self):
         self.adopt()

@@ -62,6 +62,12 @@ python3 -I -B examples/receiver-state/receiver.py revoke \
 
 終了コードは`0`がこのローカル検証の`VALID`、`1`が既知の不一致・失効等の`INVALID`、`2`が証拠・状態・検証手段の不足等の`INDETERMINATE`です。未設定・破損・ロック中・失われたDBを空の成功状態へ自動復旧しません。
 
+runtime/routingの元adapterが、不正な署名形式等を型付きの入力エラーとして拒否した場合も、
+`ADAPTER_INPUT_INVALID`・終了コード1を維持します。元adapterの検証手段が利用不能なら
+`ADAPTER_VERIFIER_UNAVAILABLE`・終了コード2です。任意の例外に付いた終了コードやメッセージを
+検証結果として採用しません。adapterが結果を返す前の失敗では、完了済みの内側レポートを作りません。
+この区別は採用前の検証にも適用し、拒否された候補をDBへ保存しません。
+
 上位レポートは`evidect-stateful-receiver/1`。runtime/routingの元の`receiver/2`、またはcredential用の`evidect-credential-receiver/1`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
 
 元の検証を完了した後に最終状態の読取りや時計の取得が失敗しても、その検証結果を保持します。
@@ -70,6 +76,10 @@ python3 -I -B examples/receiver-state/receiver.py revoke \
 すでに確認した鍵失効等の状態理由があれば、それを優先します。どの場合も既知の`INVALID`を失わせず、
 不足しか判明していない場合は`INDETERMINATE`です。最終時計を取得できなかった結果では
 `completed_at_unix`を`null`とし、開始時刻等で補いません。最終状態の読取り失敗は、最新状態の確認成功を意味しません。
+
+ライブラリの`Store.error_type`は、この保存層が返す具体的なエラー型です。別のmoduleとして読み込んだ
+同じ保存層でも、その宣言に従って分類します。試験用のラッパーや独自の保存層を渡す場合は、返す型を
+同じclass属性で明示してください。型名や`exit_code`属性だけの一致から、確定した矛盾とは判断しません。
 
 **DB全体の巻き戻し、同じOSユーザーや管理者による改変、失われたDBの正当な復旧、世界全体の最新世代、独立した時刻証明は扱いません。** 保存されたDBそのものが古い状態へ戻れば、世代と失効記録も一緒に戻ります。これを負の対照として試験します。ローカル時計の検証中の後退は検出しますが、過去に設定された時計や外部時刻とのずれは検出できません。
 

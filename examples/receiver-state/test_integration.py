@@ -212,6 +212,47 @@ class IntegrationTests(unittest.TestCase):
                 self.assertIsNone(result["completed_at_unix"])
                 self.assertEqual(self.store.path.read_bytes(), after_actions[0])
 
+    def test_independently_loaded_store_retains_signed_result_on_final_read_failure(self):
+        spec = importlib.util.spec_from_file_location("independent_signed_state_contract", HERE / "state.py")
+        independent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(independent)
+        self.assertIsNot(independent.StateError, receiver.StateError)
+        for kind in self.adapters:
+            delivery = self.delivery(kind)
+            invalid = json.loads(delivery["package"])
+            invalid["signature"]["signature"] = "0" * 128
+            for evidence_status in ("VALID", "INVALID"):
+                for unavailable in (False, True):
+                    with self.subTest(kind=kind, evidence=evidence_status, unavailable=unavailable):
+                        self.store = independent.Store.create(self.base / (kind + "-loader-" + evidence_status + "-" + str(unavailable)))
+                        self.adopt(kind, delivery)
+                        saved = self.store.directory / "unavailable.sqlite3"
+                        after_actions, checked_results = [], []
+                        def verify_then_fail(*args, **kwargs):
+                            checked = self.adapters[kind].verify_delivery(*args, **kwargs)
+                            self.assertEqual(checked["local_status"], evidence_status)
+                            checked_results.append(checked)
+                            if unavailable:
+                                self.store.path.rename(saved)
+                            else:
+                                with sqlite3.connect(self.store.path) as db:
+                                    db.execute("UPDATE streams SET kind=?", ("routing" if kind == "runtime" else "runtime",))
+                            after_actions.append((saved if unavailable else self.store.path).read_bytes())
+                            return checked
+                        samples = iter((self.now, self.now + 1))
+                        result = receiver.verify(self.store, SimpleNamespace(verify_delivery=verify_then_fail), kind, kind,
+                            delivery["package"] if evidence_status == "VALID" else encode(invalid), delivery["report"],
+                            clock=lambda: next(samples))
+                        expected = "INVALID" if evidence_status == "INVALID" or not unavailable else "INDETERMINATE"
+                        self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                        self.assertEqual(result["state_reason"], "FINAL_STATE_UNAVAILABLE" if unavailable else "FINAL_STATE_INVALID")
+                        self.assertEqual(len(checked_results), 1)
+                        self.assertIs(result["receiver"], checked_results[0])
+                        self.assertEqual((result["evaluated_at_unix"], result["completed_at_unix"]), (self.now, self.now + 1))
+                        self.assertEqual((saved if unavailable else self.store.path).read_bytes(), after_actions[0])
+                        if unavailable:
+                            self.assertFalse(self.store.path.exists())
+
     def test_invalid_signature_cannot_poison_saved_generation(self):
         first = self.delivery("runtime")
         self.adopt("runtime", first)
@@ -223,6 +264,67 @@ class IntegrationTests(unittest.TestCase):
             self.adopt("runtime", bad)
         self.assertEqual(caught.exception.code, "CANDIDATE_NOT_VERIFIED")
         self.assertEqual(self.store.select("runtime", "runtime")["generation"], 1)
+
+    def test_cli_preserves_adapter_input_rejection_without_adopting_candidate(self):
+        for kind in self.adapters:
+            with self.subTest(kind=kind):
+                first, candidate = self.delivery(kind), self.delivery(kind, 2)
+                self.adopt(kind, first)
+                package = json.loads(candidate["package"])
+                package["signature"]["signature"] = "not-a-signature"
+                paths = {name: self.base / (kind + "-invalid-" + name) for name in ("package", "report", "public", "pin")}
+                for name, raw in (("package", encode(package)), ("report", candidate["report"]),
+                                  ("public", candidate["public"].encode("ascii")), ("pin", encode(candidate["pin"]))):
+                    paths[name].write_bytes(raw)
+                inputs = {name: path.read_bytes() for name, path in paths.items()}
+                before = self.store.path.read_bytes()
+                standalone = subprocess.run([sys.executable, "-I", "-B", str(self.adapters[kind].HERE / "handoff.py"),
+                    "verify", "--package", str(paths["package"]), "--" + kind + "-report", str(paths["report"]),
+                    "--trusted-public-key", str(paths["public"]), "--checkpoint", str(paths["pin"])],
+                    capture_output=True, timeout=15)
+                self.assertEqual(standalone.returncode, 1)
+                self.assertIn(b"INVALID_HANDOFF_INPUT", standalone.stderr)
+                common = ["--state-dir", str(self.directory), "--stream", kind, "--kind", kind,
+                          "--package", str(paths["package"]), "--report", str(paths["report"])]
+                for command in ("verify", "adopt"):
+                    arguments = common if command == "verify" else common + ["--public-key", str(paths["public"]),
+                                                                            "--checkpoint", str(paths["pin"])]
+                    checked = subprocess.run([sys.executable, "-I", "-B", str(HERE / "receiver.py"), command, *arguments],
+                                             capture_output=True, timeout=15)
+                    self.assertEqual((checked.returncode, checked.stderr), (1, b""))
+                    self.assertEqual(json.loads(checked.stdout), {"format": "evidect-receiver-state-error/1",
+                        "error": "ADAPTER_INPUT_INVALID", "local_status": "INVALID"})
+                    self.assertEqual(self.store.path.read_bytes(), before)
+                    self.assertEqual(self.store.select(kind, kind)["generation"], 1)
+                self.assertEqual({name: path.read_bytes() for name, path in paths.items()}, inputs)
+
+    def test_cli_typed_adapter_unavailability_remains_indeterminate_without_adoption(self):
+        for kind in self.adapters:
+            with self.subTest(kind=kind):
+                first, candidate = self.delivery(kind), self.delivery(kind, 2)
+                self.adopt(kind, first)
+                paths = {name: self.base / (kind + "-unavailable-" + name)
+                         for name in ("package", "candidate", "report", "public", "pin")}
+                for name, raw in (("package", first["package"]), ("candidate", candidate["package"]),
+                                  ("report", candidate["report"]), ("public", candidate["public"].encode("ascii")),
+                                  ("pin", encode(candidate["pin"]))):
+                    paths[name].write_bytes(raw)
+                inputs = {name: path.read_bytes() for name, path in paths.items()}
+                before = self.store.path.read_bytes()
+                for command in ("verify", "adopt"):
+                    arguments = ["--state-dir", str(self.directory), "--stream", kind, "--kind", kind,
+                        "--package", str(paths["package" if command == "verify" else "candidate"]),
+                        "--report", str(paths["report"])]
+                    if command == "adopt":
+                        arguments += ["--public-key", str(paths["public"]), "--checkpoint", str(paths["pin"])]
+                    checked = subprocess.run([sys.executable, "-I", "-B", str(HERE / "receiver.py"), command, *arguments],
+                        capture_output=True, timeout=15, env={"PATH": str(self.base / "no-executables"), "LC_ALL": "C"})
+                    self.assertEqual((checked.returncode, checked.stderr), (2, b""))
+                    self.assertEqual(json.loads(checked.stdout), {"format": "evidect-receiver-state-error/1",
+                        "error": "ADAPTER_VERIFIER_UNAVAILABLE", "local_status": "INDETERMINATE"})
+                    self.assertEqual(self.store.path.read_bytes(), before)
+                    self.assertEqual(self.store.select(kind, kind)["generation"], 1)
+                self.assertEqual({name: path.read_bytes() for name, path in paths.items()}, inputs)
 
     def test_expiry_and_changed_raw_report_do_not_become_success(self):
         delivery = self.delivery("runtime")

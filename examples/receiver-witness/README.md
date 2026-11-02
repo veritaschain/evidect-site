@@ -42,6 +42,7 @@ witnessは自分のDBから採用済み世代・checkpoint識別子・署名者f
 | witnessの保存世代が受取側より古く、今回使った鍵の失効は示されていない | `INDETERMINATE` / `WITNESS_BEHIND_RECEIVER` |
 | 同じ世代でcheckpoint・署名者が不一致 | `INVALID` / `CHECKPOINT_DISAGREEMENT` |
 | 同じ選択、または古い世代の同じreceipt鍵が署名応答で失効扱い | `INVALID` / `WITNESS_SIGNER_REVOKED` |
+| 受取側の追加状態読取りで、保存されたstream種別と要求kindの不一致を確認 | `INVALID` / `RECEIVER_STATE_INVALID` |
 | 古い署名応答の再送、別の要求・stream・kindへの流用 | `INVALID` |
 | 無応答、壊れたDB、検証中の状態変更、往復時間超過 | 原則`INDETERMINATE`。既知の不一致は`INVALID`を維持 |
 
@@ -50,6 +51,12 @@ witnessは自分のDBから採用済み世代・checkpoint識別子・署名者f
 失効は鍵fingerprintに対する記録です。新しい世代でも同じ鍵を使っているなら、古い世代を保持するwitnessの
 署名応答にあるその鍵の失効は無視しません。一方、古い世代の別の鍵の失効を、今回使った新鍵の失効へ
 転用しません。その場合は古いwitness選択による未確定を維持し、鍵や世代を自動採用しません。
+
+受取側の追加状態読取りでも、ローカル保存層が明確なスコープ不一致として返したエラーを保持します。
+要求送信前・署名応答の検証後・最後の状態確認のいずれでも`RECEIVER_STATE_INVALID`となり、
+完了済みの内側の検証結果は保持します。すでに署名応答の矛盾を確認していれば、その`INVALID`と理由を優先します。
+一般的なDB破損・読取不能は従来どおり未確定です。このエラー分類はローカル状態読取りに限り、
+伝送処理が返した未認証の例外を、witnessの署名付き主張や確定した状態矛盾として扱いません。
 
 ## 再現
 

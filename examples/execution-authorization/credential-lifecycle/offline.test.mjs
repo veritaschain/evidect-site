@@ -246,6 +246,64 @@ test('a valid approval for another valid request does not approve this request',
   limitations(result);
 });
 
+test('provider correlation preserves dispatch conflicts independently of approval verification', () => {
+  const value = scenario(), other = value.fixture.input(value.input.operation);
+  const cases = [
+    { name: 'missing', signature: 'INDETERMINATE', binding: 'INDETERMINATE', change(attempt) {
+      attempt.signed_inputs.approval = null;
+    } },
+    { name: 'invalid signature', signature: 'INVALID', binding: 'VALID', change(attempt) {
+      flipSignature(attempt.signed_inputs.approval);
+    } },
+    { name: 'different request', signature: 'VALID', binding: 'INVALID', change(attempt) {
+      attempt.signed_inputs.approval = clone(other.approval);
+    } },
+  ];
+  const beforeProvider = value.fixture.providerOwned.inspect();
+  for (const item of cases) for (const duplicate of [false, true]) {
+    const evidence = clone(value.evidence);
+    item.change(evidence.attempts[0]);
+    if (duplicate) evidence.attempts.push(clone(evidence.attempts[0]));
+    const beforeEvidence = clone(evidence);
+    const result = check(value, { evidence });
+    const expected = duplicate || item.name !== 'missing' ? 'INVALID' : 'INDETERMINATE';
+    assert.equal(result.evidence_consistency, expected, item.name);
+    assert.equal(result.overall_status, expected, item.name);
+    assert.equal(result.provider_correlation.status, duplicate ? 'INVALID' : 'CONSISTENT', item.name);
+    assert.equal(result.provider_correlation.reason, duplicate ? 'DUPLICATE_DISPATCH_ID'
+      : 'SCOPED_PROVIDER_RECORDS_CONSISTENT', item.name);
+    for (const attempt of result.attempts) {
+      assert.equal(attempt.request_signature.status, 'VALID');
+      assert.equal(attempt.operation_binding.status, 'VALID');
+      assert.equal(attempt.approval_signature.status, item.signature);
+      assert.equal(attempt.approval_binding.status, item.binding);
+    }
+    if (!duplicate) {
+      assert.equal(result.attempts[0].provider_correlation.associationSource, 'RESPONSE_AND_OBSERVATION');
+      assert.equal(result.attempts[0].status, expected);
+    }
+    assert.deepEqual(evidence, beforeEvidence);
+    limitations(result);
+  }
+  assert.deepEqual(value.fixture.providerOwned.inspect(), beforeProvider);
+});
+
+test('provider correlation still requires verified request operation and separately selected scope', () => {
+  const value = scenario();
+  const noKey = clone(value.trust); noKey.issuerKeys = [];
+  const changedOperation = clone(value.evidence);
+  changedOperation.attempts[0].operation.principal = 'different-operator';
+  for (const changes of [{ trust: noKey }, { evidence: changedOperation }, { expectedContextId: undefined }]) {
+    const result = check(value, changes);
+    assert.equal(result.provider_correlation.status, 'INDETERMINATE');
+    assert.deepEqual(result.provider_correlation.attempts, []);
+    assert.equal(result.attempts[0].provider_correlation.reason, 'SIGNED_REQUEST_BINDING_UNRESOLVED');
+    assert.notEqual(result.evidence_consistency, 'VALID');
+    assert.equal(result.overall_status, changes.evidence ? 'INVALID' : 'INDETERMINATE');
+    limitations(result);
+  }
+});
+
 test('offline operation binding includes the actual credential, principal, tenant, route and validity', () => {
   const value = scenario();
   const changes = {

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import unittest
@@ -179,6 +180,58 @@ class WitnessIntegrationTests(unittest.TestCase):
                     self.assertIs(current["revoked"], revoke and not rotate)
                     self.assertIs(current["checked_key_revoked"], revoke)
                     self.assertEqual([store.path.read_bytes() for store in (self.store, self.witness_store)], after_actions[0])
+
+    def test_local_state_read_classification_at_each_witness_boundary(self):
+        # The fixture and witness load receiver.py independently. Classification
+        # follows this Store's declared error type, not Python module identity.
+        self.assertIsNot(base.StateError, w.load_receiver().StateError)
+        for kind in self.adapters:
+            for stage in ("post-base", "post-response", "final-clock"):
+                for unavailable in (False, True):
+                    with self.subTest(kind=kind, stage=stage, unavailable=unavailable):
+                        suffix = kind + "-read-" + stage + "-" + str(unavailable)
+                        self.store = base.Store.create(self.base / (suffix + "-receiver"))
+                        self.witness_store = base.Store.create(self.base / (suffix + "-witness"))
+                        delivery = self.setup_pair(kind)
+                        selected_trust = self.selected_trust(kind)
+                        saved = self.store.directory / "unavailable.sqlite3"
+                        samples, after_failure = [], []
+                        def fail_state():
+                            if unavailable:
+                                self.store.path.rename(saved)
+                            else:
+                                with sqlite3.connect(self.store.path) as db:
+                                    db.execute("UPDATE streams SET kind=?", ("routing" if kind == "runtime" else "runtime",))
+                            after_failure.append([(saved if unavailable else self.store.path).read_bytes(),
+                                                  self.witness_store.path.read_bytes()])
+                        def clock():
+                            samples.append(1)
+                            if ((stage == "post-base" and len(samples) == 2) or
+                                    (stage == "final-clock" and len(samples) == 3)):
+                                fail_state()
+                            return self.now
+                        def exchange(query):
+                            response = self.transport()(query)
+                            if stage == "post-response":
+                                fail_state()
+                            return response
+                        result = w.verify(self.store, self.adapters[kind], kind, kind, delivery["package"], delivery["report"],
+                                          selected_trust, exchange, clock=clock)
+                        expected = "INDETERMINATE" if unavailable else "INVALID"
+                        self.assertEqual((result["local_status"], result["witness_status"]), (expected, expected))
+                        self.assertEqual(result["witness_reason"], "WITNESS_OR_STATE_UNAVAILABLE" if unavailable
+                                         else "RECEIVER_STATE_INVALID")
+                        self.assertEqual(result["receiver"]["local_status"], "VALID")
+                        self.assertEqual(result["signed_witness_response"] is None, stage == "post-base")
+                        self.assertEqual(result["query_sha256"] is None, stage == "post-base")
+                        with self.assertRaises(base.StateError) as caught:
+                            self.store.select(kind, kind)
+                        self.assertEqual((caught.exception.code, caught.exception.exit_code),
+                            ("STATE_UNAVAILABLE", 2) if unavailable else ("STREAM_SCOPE_MISMATCH", 1))
+                        self.assertEqual([(saved if unavailable else self.store.path).read_bytes(),
+                                          self.witness_store.path.read_bytes()], after_failure[0])
+                        if unavailable:
+                            self.assertFalse(self.store.path.exists())
 
     def test_same_generation_different_signed_checkpoint_is_conflict(self):
         first, different = self.delivery("runtime"), self.delivery("runtime")

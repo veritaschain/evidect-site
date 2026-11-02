@@ -142,6 +142,13 @@ The aggregate report and provider observations remain unsigned even if retained 
 `reported_execution` is an unsigned assertion. Clear contradictions between that assertion and other
 supplied fields produce `INVALID`; internal consistency does not prove that the reported action occurred.
 
+Provider correlation uses the verified request signature and operation binding, together with the
+receiver-selected context and provider identity. Missing approval material does not suppress an
+independently checkable duplicate dispatch or other supplied-record contradiction. Approval signature
+and binding checks still contribute separately to the aggregate verdict: matching provider records
+cannot establish a missing approval or historical authorization. An unverified request or unresolved
+operation binding is not admitted as a verified correlation input.
+
 The offline result's `evidence_consistency` is `VALID`, `INVALID` or `INDETERMINATE`, limited to the
 supplied material and separate trust/scope inputs. `overall_status` is never `VALID`: it remains
 `INDETERMINATE`, or is `INVALID` when contradictions are established. The CLI returns 0 for limited
@@ -261,6 +268,13 @@ unavailable final read; `FINAL_STATE_INVALID` records a state contradiction foun
 precedence. Known adapter contradictions and observed signer revocation remain `INVALID`; missing
 prerequisites alone remain `INDETERMINATE`. When the final clock cannot be sampled,
 `completed_at_unix` is null. A failed final read does not establish current state or freshness.
+
+Additional local state reads during witness verification preserve the store's explicit stream-kind
+contradiction as `INVALID / RECEIVER_STATE_INVALID`, before the query, after response verification,
+or at the final read. Completed inner verification remains available. An already established witness
+contradiction retains its original reason. General state corruption or unavailability remains
+`INDETERMINATE`. This classification applies only to the local store read; an unauthenticated
+transport exception cannot supply a signed witness assertion or a definite state contradiction.
 
 The witness uses a separate local database, child process and signing key under the same OS user
 and controller. The fixed test transport is not an independent host or authenticated production

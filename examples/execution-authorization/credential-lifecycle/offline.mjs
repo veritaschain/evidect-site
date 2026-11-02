@@ -329,7 +329,10 @@ export function verifyCredentialEvidence(raw) {
     } catch { output.operation_binding = invalid('OPERATION_OR_CONTEXT_BINDING_MISMATCH'); }
     Object.assign(output, collectorChecks(attempt.collector_evidence, request.payload ?? null,
       request.digest ?? null, operation ?? null, adopted.collector));
-    const bound = [output.request_signature, output.approval_signature, output.approval_binding, output.operation_binding];
+    // Provider-record correlation needs a verified request and its operation,
+    // not a successful approval check. Approval remains a separate prerequisite
+    // in the attempt verdict; missing approval cannot hide a record conflict.
+    const bound = [output.request_signature, output.operation_binding];
     if (merge(bound) === 'VALID' && result.context_binding.status === 'VALID' && adopted.provider) {
       try {
         need(sameIdentity(providerIdentitySnapshot(attempt.provider_identity), adopted.provider));

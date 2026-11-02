@@ -8,6 +8,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -370,6 +371,69 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
                 self.assertEqual(lab.databases(), after_actions[0])
                 self.assertEqual(first, inputs)
 
+    def test_local_scope_conflict_during_witness_reads_keeps_invalid_source_and_saved_review(self):
+        for phase in ("after_base", "after_response", "final_clock"):
+            with self.subTest(phase=phase):
+                directory = self.root / ("local-scope-" + phase)
+                directory.mkdir(mode=0o700)
+                lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+                delivery = lab.delivery(); lab.adopt_pair(delivery)
+                original_receiver = lab.local(delivery)
+                self.assertEqual(original_receiver["local_status"], "VALID")
+                before, original_inputs = lab.databases(), copy.deepcopy(delivery)
+                clocks, after_actions, queries = [], [], []
+                transport = lab.transport()
+
+                def change_local_scope():
+                    # Explicit fixture corruption, outside the read-only verifier.
+                    db = sqlite3.connect(lab.store.path)
+                    try:
+                        changed = db.execute("UPDATE streams SET kind=? WHERE stream=?", ("runtime", lab.stream))
+                        self.assertEqual(changed.rowcount, 1)
+                        db.commit()
+                    finally:
+                        db.close()
+                    after_actions.append(lab.databases())
+
+                def clock():
+                    clocks.append(1)
+                    if (phase == "after_base" and len(clocks) == 2) or (phase == "final_clock" and len(clocks) == 3):
+                        change_local_scope()
+                    return lab.now
+
+                def exchange(query):
+                    queries.append(query)
+                    response = transport(query)
+                    if phase == "after_response":
+                        change_local_scope()
+                    return response
+
+                source = f.witness.verify(lab.store, lab.adapter_for(delivery), lab.stream, f.KIND,
+                    delivery["package"], delivery["evidence"], lab.selected_trust(), exchange, clock=clock)
+                self.assertEqual((source["local_status"], source["overall_status"], source["witness_status"]),
+                                 ("INVALID", "INVALID", "INVALID"))
+                self.assertEqual(source["witness_reason"], "RECEIVER_STATE_INVALID")
+                self.assertEqual(source["receiver"], original_receiver)
+                if phase == "after_base":
+                    self.assertEqual(queries, [])
+                    self.assertIsNone(source["query_sha256"])
+                    self.assertIsNone(source["signed_witness_response"])
+                else:
+                    self.assertEqual(len(queries), 1)
+                    self.assertEqual(source["query_sha256"], f.witness.digest(queries[0]))
+                    self.assertIsNotNone(source["signed_witness_response"])
+                    self.assertEqual(source["signed_witness_response"]["payload"]["query_sha256"], source["query_sha256"])
+                self.assertEqual(len(clocks), 3 if phase == "final_clock" else 2)
+                self.assertEqual(len(after_actions), 1)
+                self.assertNotEqual(after_actions[0][0], before[0])
+                self.assertEqual(after_actions[0][1], before[1])
+                with self.assertRaises(f.receiver.StateError) as caught:
+                    lab.store.select(lab.stream, f.KIND)
+                self.assertEqual((caught.exception.code, caught.exception.exit_code), ("STREAM_SCOPE_MISMATCH", 1))
+                self.assert_witness_failure_export(directory / "review", source, "INVALID", "RECEIVER_STATE_INVALID")
+                self.assertEqual(lab.databases(), after_actions[0])
+                self.assertEqual(delivery, original_inputs)
+
     def assert_final_failure_export(self, mode, *, bad_signature=False, state_failure=None,
                                     clock_failure=None, revoke=False):
         name = "-".join(map(str, (mode, bad_signature, state_failure, clock_failure, revoke)))
@@ -387,6 +451,8 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
         adapter = lab.adapter_for(delivery)
 
         class FinalRead:
+            error_type = f.receiver.StateError
+
             def select(self, *args, **kwargs):
                 reads.append(1)
                 if len(reads) == 2:

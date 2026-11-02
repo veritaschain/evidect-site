@@ -143,10 +143,25 @@ def _snapshot(selected):
     return value
 
 
+def _select_receiver(store, stream, kind, *, checked_fingerprint=None):
+    # Only an error from this local read carries the receiver store's verdict.
+    # An exception supplied by transport is not an authenticated state claim.
+    try:
+        return store.select(stream, kind, checked_fingerprint=checked_fingerprint)
+    except ValueError as error:
+        # A Store loaded under another module name owns a distinct Python error
+        # class. Use its explicit contract, not a class name or arbitrary code.
+        if type(error) is not getattr(type(store), "error_type", None):
+            raise
+        if type(error.exit_code) is int and error.exit_code == 1:
+            raise WitnessError("RECEIVER_STATE_INVALID", "INVALID") from None
+        raise WitnessError("WITNESS_OR_STATE_UNAVAILABLE") from None
+
+
 def _current_receiver(store, stream, kind, original):
     # Check the key actually used, even if a later adoption selects a new one.
     # Selection and revocation come from the same read transaction.
-    selected = store.select(stream, kind, checked_fingerprint=original["signer_fingerprint"])
+    selected = _select_receiver(store, stream, kind, checked_fingerprint=original["signer_fingerprint"])
     if selected["checked_key_revoked"]:
         raise WitnessError("RECEIVER_SIGNER_REVOKED", "INVALID")
     if _snapshot(selected) != original:
@@ -265,7 +280,7 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
         if evidence["local_status"] == "VALID":
             local = _verified_receiver_snapshot(evidence, kind)
         else:
-            local = snapshot(store, stream, kind)
+            local = _snapshot(_select_receiver(store, stream, kind))
         if local["store_id"] == expected["store_id"]:
             raise WitnessError("WITNESS_STORE_NOT_SEPARATE", "INVALID")
         if evidence["local_status"] == "VALID":

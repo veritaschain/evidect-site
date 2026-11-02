@@ -12,6 +12,7 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("tested_witness", HERE / "witness.py")
 w = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(w)
+StateError = w.load_receiver().StateError
 KEYGEN = "const c=require('node:crypto'),k=c.generateKeyPairSync('ed25519');console.log(JSON.stringify({private:k.privateKey.export({format:'pem',type:'pkcs8'}),public:k.publicKey.export({format:'pem',type:'spki'})}));"
 
 
@@ -20,6 +21,8 @@ def pair():
 
 
 class FakeStore:
+    error_type = StateError
+
     def __init__(self, store_id):
         self.revoked_fingerprints = set()
         self.selected = {"store_id": store_id, "revision": 1, "kind": "runtime", "generation": 2,
@@ -244,6 +247,87 @@ class WitnessTests(unittest.TestCase):
                 self.assertIsNone(result["query_sha256"])
                 self.assertIsNone(result["signed_witness_response"])
                 self.assertEqual(calls, [])
+
+    def test_local_state_error_classification_preserves_known_signed_conflicts(self):
+        original_verify = self.base.verify
+        for stage in ("initial", "after-response", "final-clock"):
+            for code, exit_code in (("STREAM_SCOPE_MISMATCH", 1), ("STATE_UNAVAILABLE", 2), ("STATE_CORRUPT", 2)):
+                for known_conflict in ((False,) if stage == "initial" else (False, True)):
+                    with self.subTest(stage=stage, code=code, known_conflict=known_conflict):
+                        self.local, self.remote = FakeStore("1" * 32), FakeStore("2" * 32)
+                        if known_conflict:
+                            self.remote.selected["generation"] += 1
+                        phase = ["base"]
+                        select = self.local.select
+                        def failing_select(*args, **kwargs):
+                            if phase[0] == stage:
+                                raise StateError(code, exit_code)
+                            return select(*args, **kwargs)
+                        def finish_base(*args, **kwargs):
+                            result = original_verify(*args, **kwargs)
+                            phase[0] = "initial"
+                            return result
+                        def exchange(query):
+                            response = self.reply(query)
+                            phase[0] = "after-response"
+                            return response
+                        def finish_clock(_clock):
+                            phase[0] = "final-clock"
+                            return 1000
+                        with patch.object(self.local, "select", side_effect=failing_select), \
+                                patch.object(self.base, "verify", side_effect=finish_base), \
+                                patch.object(self.base, "sample_time", side_effect=finish_clock):
+                            result = self.check(exchange)
+                        expected = "INVALID" if known_conflict or exit_code == 1 else "INDETERMINATE"
+                        reason = "RECEIVER_BEHIND_WITNESS" if known_conflict else (
+                            "RECEIVER_STATE_INVALID" if exit_code == 1 else "WITNESS_OR_STATE_UNAVAILABLE")
+                        self.assertEqual((result["local_status"], result["witness_status"]), (expected, expected))
+                        self.assertEqual(result["witness_reason"], reason)
+                        self.assertEqual(result["receiver"]["local_status"], "VALID")
+                        self.assertEqual(result["signed_witness_response"] is None, stage == "initial")
+                        self.assertEqual(result["query_sha256"] is None, stage == "initial")
+
+    def test_transport_state_error_is_not_an_authenticated_receiver_contradiction(self):
+        for exit_code in (1, 2):
+            with self.subTest(exit_code=exit_code):
+                def exchange(_query):
+                    raise StateError("private-unverified-transport-claim", exit_code)
+                result = self.check(exchange)
+                self.assertEqual((result["local_status"], result["witness_reason"]),
+                                 ("INDETERMINATE", "WITNESS_OR_STATE_UNAVAILABLE"))
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["query_sha256"])
+                self.assertIsNone(result["signed_witness_response"])
+                self.assertNotIn("private-unverified-transport-claim", json.dumps(result))
+
+    def test_unrecognized_local_exceptions_cannot_claim_invalid_by_exit_code(self):
+        original = self.base.verify
+        for undeclared in (False, True):
+            for own_error in (False, True):
+                with self.subTest(undeclared=undeclared, own_error=own_error):
+                    error = StateError("private-unverified-local-claim", 1) if own_error else ValueError("private-unverified-local-claim")
+                    error.exit_code = 1
+                    select = self.local.select
+                    ready = [False]
+                    def failing_select(*args, **kwargs):
+                        if ready[0]:
+                            raise error
+                        return select(*args, **kwargs)
+                    def finish_base(*args, **kwargs):
+                        result = original(*args, **kwargs)
+                        ready[0] = True
+                        return result
+                    with patch.object(FakeStore, "error_type", None if undeclared else StateError), \
+                            patch.object(self.local, "select", side_effect=failing_select), \
+                            patch.object(self.base, "verify", side_effect=finish_base):
+                        result = self.check()
+                    declared_match = own_error and not undeclared
+                    self.assertEqual(result["local_status"], "INVALID" if declared_match else "INDETERMINATE")
+                    self.assertEqual(result["witness_reason"], "RECEIVER_STATE_INVALID" if declared_match
+                                     else "WITNESS_OR_STATE_UNAVAILABLE")
+                    self.assertIsNone(result["query_sha256"])
+                    self.assertIsNone(result["signed_witness_response"])
+                    self.assertNotIn("private-unverified-local-claim", json.dumps(result))
 
     def test_used_signer_requires_complete_verified_adapter_metadata(self):
         original = self.base.verify

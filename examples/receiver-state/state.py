@@ -89,6 +89,8 @@ class Store:
     attackers, backups restored over the whole store, and filesystem rollback
     are outside this experiment's boundary. Missing state is never recreated.
     """
+    error_type = StateError
+
     def __init__(self, directory):
         self.directory = Path(directory).absolute()
         self.path = self.directory / DB_NAME
