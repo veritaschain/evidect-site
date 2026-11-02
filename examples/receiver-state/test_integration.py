@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -141,6 +142,75 @@ class IntegrationTests(unittest.TestCase):
                     self.assertIs(selected["revoked"], False)
                     self.assertIs(selected["checked_key_revoked"], revoke_used_key)
                     self.assertEqual(self.store.path.read_bytes(), after_actions[0])
+
+    def test_completed_signature_verdict_survives_final_clock_or_state_failure(self):
+        for kind in self.adapters:
+            delivery = self.delivery(kind)
+            changed = json.loads(delivery["package"])
+            changed["signature"]["signature"] = "0" * 128
+            invalid_package = encode(changed)
+            for evidence_status in ("VALID", "INVALID"):
+                for failure in ("clock", "state-unavailable", "state-invalid"):
+                    with self.subTest(kind=kind, evidence=evidence_status, failure=failure):
+                        self.store = receiver.Store.create(self.base / (kind + "-" + evidence_status + "-" + failure))
+                        self.adopt(kind, delivery)
+                        saved_path = self.store.directory / "unavailable.sqlite3"
+                        after_actions = []
+                        checked_results = []
+                        def verify_then_fail(*args, **kwargs):
+                            checked = self.adapters[kind].verify_delivery(*args, **kwargs)
+                            self.assertEqual(checked["local_status"], evidence_status)
+                            checked_results.append(checked)
+                            if failure == "state-unavailable":
+                                self.store.path.rename(saved_path)
+                                after_actions.append(saved_path.read_bytes())
+                            else:
+                                if failure == "state-invalid":
+                                    with sqlite3.connect(self.store.path) as db:
+                                        db.execute("UPDATE streams SET kind=?", ("routing" if kind == "runtime" else "runtime",))
+                                after_actions.append(self.store.path.read_bytes())
+                            return checked
+                        samples = iter((self.now, None if failure == "clock" else self.now + 1))
+                        package = delivery["package"] if evidence_status == "VALID" else invalid_package
+                        result = receiver.verify(self.store, SimpleNamespace(verify_delivery=verify_then_fail),
+                            kind, kind, package, delivery["report"], clock=lambda: next(samples))
+                        expected = "INVALID" if evidence_status == "INVALID" or failure == "state-invalid" else "INDETERMINATE"
+                        self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                        self.assertEqual(result["state_reason"], {"clock": "LOCAL_CLOCK_UNAVAILABLE",
+                            "state-unavailable": "FINAL_STATE_UNAVAILABLE", "state-invalid": "FINAL_STATE_INVALID"}[failure])
+                        self.assertIs(result["receiver"], checked_results[0])
+                        self.assertEqual(len(checked_results), 1)
+                        self.assertEqual(result["completed_at_unix"], None if failure == "clock" else self.now + 1)
+                        self.assertEqual(result["evaluated_at_unix"], self.now)
+                        self.assertEqual(result["generation"], 1)
+                        json.dumps(result, allow_nan=False)
+                        if failure == "state-unavailable":
+                            self.assertFalse(self.store.path.exists())
+                            self.assertEqual(saved_path.read_bytes(), after_actions[0])
+                        else:
+                            self.assertEqual(self.store.path.read_bytes(), after_actions[0])
+
+    def test_observed_revocation_survives_final_clock_failure_with_real_signatures(self):
+        for kind in self.adapters:
+            with self.subTest(kind=kind):
+                self.store = receiver.Store.create(self.base / kind)
+                delivery = self.delivery(kind)
+                self.adopt(kind, delivery)
+                after_actions = []
+                def verify_then_revoke(*args, **kwargs):
+                    checked = self.adapters[kind].verify_delivery(*args, **kwargs)
+                    self.assertEqual(checked["local_status"], "VALID")
+                    self.store.revoke(delivery["pin"]["key_fingerprint"])
+                    after_actions.append(self.store.path.read_bytes())
+                    return checked
+                samples = iter((self.now, None))
+                result = receiver.verify(self.store, SimpleNamespace(verify_delivery=verify_then_revoke),
+                    kind, kind, delivery["package"], delivery["report"], clock=lambda: next(samples))
+                self.assertEqual((result["local_status"], result["overall_status"], result["state_reason"]),
+                                 ("INVALID", "INVALID", "KEY_REVOKED"))
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNone(result["completed_at_unix"])
+                self.assertEqual(self.store.path.read_bytes(), after_actions[0])
 
     def test_invalid_signature_cannot_poison_saved_generation(self):
         first = self.delivery("runtime")

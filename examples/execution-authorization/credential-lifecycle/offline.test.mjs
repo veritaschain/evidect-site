@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createPublicKey, verify } from 'node:crypto';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,41 @@ function consistent(result) {
   assert.equal(result.evidence_consistency, 'VALID');
   assert.equal(result.overall_status, 'INDETERMINATE');
   limitations(result);
+}
+
+function withOfflineCliInputs(value, body) {
+  const directory = mkdtempSync(join(tmpdir(), 'evidect-unavailable-config-marker-'));
+  const paths = Object.fromEntries(['evidence', 'trust', 'expectation'].map(name => [name, join(directory, name + '.json')]));
+  const script = fileURLToPath(new URL('./verify-offline.mjs', import.meta.url));
+  try {
+    writeFileSync(paths.evidence, JSON.stringify(value.evidence));
+    writeFileSync(paths.trust, JSON.stringify(value.trust));
+    writeFileSync(paths.expectation, JSON.stringify({ format: 'evidect-credential-offline-expectation/1',
+      contextId: value.expectedContextId, requestDigests: value.expectedRequestDigests }));
+    const captureInputs = () => Object.fromEntries(Object.entries(paths)
+      .map(([name, path]) => [name, existsSync(path) ? readFileSync(path) : null]));
+    body(paths, () => {
+      const before = captureInputs();
+      const processResult = spawnSync(process.execPath, [script, paths.evidence, paths.trust, paths.expectation],
+        { encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+      assert.equal(processResult.error, undefined);
+      assert.equal(processResult.signal, null);
+      assert.equal(processResult.stderr, '');
+      assert.deepEqual(captureInputs(), before, 'Verification must not write inputs or create absent configuration');
+      assert.ok(!processResult.stdout.includes(directory));
+      assert.ok(!processResult.stdout.includes('CONFIG_CONTENT_MUST_NOT_LEAK'));
+      const result = JSON.parse(processResult.stdout);
+      limitations(result);
+      return { code: processResult.status, result };
+    });
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+const unavailableConfigurations = [null, '{"marker":"CONFIG_CONTENT_MUST_NOT_LEAK"',
+  '{"unexpected":"CONFIG_CONTENT_MUST_NOT_LEAK"}'];
+function replaceConfiguration(path, raw) {
+  if (raw === null) rmSync(path, { force: true });
+  else writeFileSync(path, raw);
 }
 
 test('offline verification recomputes original signed envelopes after a JSON round trip', () => {
@@ -590,4 +625,59 @@ test('offline CLI rejects a FIFO before waiting for a writer', () => {
     assert.equal(diagnostic.evidence_consistency, 'INDETERMINATE');
     limitations(diagnostic);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('offline CLI preserves a signature mismatch when expected scope is missing or malformed', () => {
+  const value = scenario();
+  flipSignature(value.evidence.attempts[0].signed_inputs.request);
+  for (const raw of unavailableConfigurations) withOfflineCliInputs(value, (paths, run) => {
+    replaceConfiguration(paths.expectation, raw);
+    const { code, result } = run();
+    assert.equal(code, 1);
+    assert.equal(result.evidence_consistency, 'INVALID');
+    assert.equal(result.overall_status, 'INVALID');
+    assert.equal(result.attempts[0].request_signature.status, 'INVALID');
+    assert.equal(result.attempts[0].request_signature.reason, 'SIGNATURE_OR_SUBJECT_MISMATCH');
+    assert.equal(result.trust_material.status, 'VALID');
+    assert.equal(result.context_binding.reason, 'RECEIVER_EXPECTATION_UNAVAILABLE');
+    assert.equal(result.inventory.reason, 'RECEIVER_EXPECTATION_UNAVAILABLE');
+  });
+});
+
+test('offline CLI preserves an original operation mismatch when selected trust is unavailable', () => {
+  const value = scenario();
+  value.evidence.attempts[0].operation.principal = 'different-operator';
+  for (const raw of unavailableConfigurations) withOfflineCliInputs(value, (paths, run) => {
+    replaceConfiguration(paths.trust, raw);
+    const { code, result } = run();
+    assert.equal(code, 1);
+    assert.equal(result.evidence_consistency, 'INVALID');
+    assert.equal(result.overall_status, 'INVALID');
+    assert.equal(result.trust_material.status, 'INDETERMINATE');
+    assert.equal(result.attempts[0].request_signature.status, 'INDETERMINATE');
+    assert.equal(result.attempts[0].request_signature.reason, 'TRUST_KEY_UNAVAILABLE');
+    assert.equal(result.attempts[0].operation_binding.status, 'INVALID');
+    assert.equal(result.attempts[0].operation_binding.reason, 'OPERATION_OR_CONTEXT_BINDING_MISMATCH');
+  });
+});
+
+test('offline CLI never adopts missing trust or expected scope from matching evidence', () => {
+  const value = scenario();
+  for (const fields of [['trust'], ['expectation'], ['trust', 'expectation']]) {
+    for (const raw of unavailableConfigurations) withOfflineCliInputs(value, (paths, run) => {
+      for (const field of fields) replaceConfiguration(paths[field], raw);
+      const { code, result } = run();
+      assert.equal(code, 2);
+      assert.equal(result.evidence_consistency, 'INDETERMINATE');
+      assert.equal(result.overall_status, 'INDETERMINATE');
+      assert.equal(result.attempts[0].request_signature.status, fields.includes('trust') ? 'INDETERMINATE' : 'VALID');
+      assert.equal(result.trust_material.status, fields.includes('trust') ? 'INDETERMINATE' : 'VALID');
+      assert.equal(result.context_binding.status, 'INDETERMINATE');
+      if (fields.includes('expectation')) {
+        assert.equal(result.context_binding.reason, 'RECEIVER_EXPECTATION_UNAVAILABLE');
+        assert.equal(result.inventory.reason, 'RECEIVER_EXPECTATION_UNAVAILABLE');
+        assert.equal(result.inventory.expected_count, 0);
+      }
+    });
+  }
 });

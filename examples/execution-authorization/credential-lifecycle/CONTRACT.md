@@ -145,7 +145,12 @@ supplied fields produce `INVALID`; internal consistency does not prove that the 
 The offline result's `evidence_consistency` is `VALID`, `INVALID` or `INDETERMINATE`, limited to the
 supplied material and separate trust/scope inputs. `overall_status` is never `VALID`: it remains
 `INDETERMINATE`, or is `INVALID` when contradictions are established. The CLI returns 0 for limited
-`VALID` consistency, 1 for `INVALID`, and 2 for unresolved material or file-input errors.
+`VALID` consistency, 1 for `INVALID`, and 2 for unresolved material or file-input errors when no
+contradiction can be established. If selected trust or expectation files cannot be read or parsed,
+the CLI treats that configuration as unavailable and still performs checks supported by the remaining
+inputs. A request-signature mismatch remains `INVALID` when trust is available but expectation is
+not. Unavailable configuration is never recovered from evidence, and matching remaining checks alone
+cannot produce `VALID`. An unreadable evidence file or invalid evidence JSON remains a file-input failure.
 Each input file is limited to 2 MiB. The reader rejects duplicate keys, excessive nesting and invalid
 UTF-8. Numeric input must use JSON integer lexemes within the safe-integer range; decimal and exponent
 forms are rejected before conversion, rather than rounded into an accepted integer.
@@ -235,6 +240,14 @@ change or checkpoint expiry, including at the final receiver-state read in witne
 A selection change alone remains `INDETERMINATE`. These checks do not observe later changes or
 establish continuous validity after the final read.
 
+Once the adapter has returned a result, failures of the final state read or final clock sample do
+not discard it or rerun verification without adopted trust. `FINAL_STATE_UNAVAILABLE` records an
+unavailable final read; `FINAL_STATE_INVALID` records a state contradiction found during that read.
+`LOCAL_CLOCK_UNAVAILABLE` records a failed final time sample unless a state diagnosis already takes
+precedence. Known adapter contradictions and observed signer revocation remain `INVALID`; missing
+prerequisites alone remain `INDETERMINATE`. When the final clock cannot be sampled,
+`completed_at_unix` is null. A failed final read does not establish current state or freshness.
+
 The witness uses a separate local database, child process and signing key under the same OS user
 and controller. The fixed test transport is not an independent host or authenticated production
 service. Receiver-only rollback can be detected against a newer witness selection; simultaneous
@@ -288,8 +301,9 @@ original input materials and the current receiver selection; changing a saved re
 manifest does not resolve a signature, binding or state contradiction.
 
 All saved views describe the verification run, not the time at which a reader opens the file.
-The time is from an unattested local clock. Recorded witness agreement does not become a new
-live challenge, establish current collector freshness, or attest that a saved report remains
+The time is from an unattested local clock. An unavailable completion time remains null and is
+displayed as unrecorded; it is not replaced with the start or export time. Recorded witness agreement
+does not become a new live challenge, establish current collector freshness, or attest that a saved report remains
 current. Later use requires the original inputs and the receiver's current selection and state.
 The reports and manifest are unsigned and editable; they do not provide independent assessment,
 provider authenticity, full-history completeness, production authorization or legal compliance.

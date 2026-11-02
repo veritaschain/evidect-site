@@ -103,17 +103,33 @@ def verify(store, adapter, stream, kind, package, report, *, clock=time.time):
     checked = _invoke(adapter, package, report, selected["public_key"], selected["checkpoint"], start, kind)
     # Use a new transaction after crypto/semantic verification. Do not compare
     # against the original read transaction, which would retain its old snapshot.
-    current = store.select(stream, kind, checked_fingerprint=selected["checkpoint"]["key_fingerprint"])
-    end = sample_time(clock)
     reason, policy = "CURRENT_LOCAL_SELECTION", "VALID"
-    if current["checked_key_revoked"]:
-        reason, policy = "KEY_REVOKED", "INVALID"
-    elif (current["store_id"], current["revision"]) != (selected["store_id"], selected["revision"]):
-        reason, policy = "STATE_CHANGED_DURING_VERIFICATION", "INDETERMINATE"
-    elif end < start:
-        reason, policy = "LOCAL_CLOCK_REGRESSED", "INDETERMINATE"
-    elif end >= selected["checkpoint"]["expires_at"]:
-        reason, policy = "CHECKPOINT_EXPIRED", "INDETERMINATE"
+    try:
+        current = store.select(stream, kind, checked_fingerprint=selected["checkpoint"]["key_fingerprint"])
+    except StateError as error:
+        # A failed final read cannot discard verification already completed
+        # under the adopted key, or reinterpret a known contradiction as unknown.
+        reason, policy = (("FINAL_STATE_INVALID", "INVALID") if error.exit_code == 1
+                          else ("FINAL_STATE_UNAVAILABLE", "INDETERMINATE"))
+    else:
+        if current["checked_key_revoked"]:
+            reason, policy = "KEY_REVOKED", "INVALID"
+        elif (current["store_id"], current["revision"]) != (selected["store_id"], selected["revision"]):
+            reason, policy = "STATE_CHANGED_DURING_VERIFICATION", "INDETERMINATE"
+    end = None
+    try:
+        end = sample_time(clock)
+    except StateError:
+        # No completion time was obtained. Keep any previously observed state
+        # failure (including revocation) and let the evidence verdict dominate.
+        if policy == "VALID":
+            reason, policy = "LOCAL_CLOCK_UNAVAILABLE", "INDETERMINATE"
+    else:
+        if policy == "VALID":
+            if end < start:
+                reason, policy = "LOCAL_CLOCK_REGRESSED", "INDETERMINATE"
+            elif end >= selected["checkpoint"]["expires_at"]:
+                reason, policy = "CHECKPOINT_EXPIRED", "INDETERMINATE"
     statuses = (policy, checked["local_status"])
     local = "INVALID" if "INVALID" in statuses else "INDETERMINATE" if "INDETERMINATE" in statuses else "VALID"
     return _result(selected, local, reason, start, end, checked)

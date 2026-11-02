@@ -143,6 +143,11 @@ node examples/execution-authorization/credential-lifecycle/verify-offline.mjs \
 数値は安全整数の範囲にあるJSON整数字句だけを受理し、小数点・指数表現は数値変換前に拒否します。
 独自の合成入力を用意する場合は、[要求・鍵の件数上限と判定理由](CONTRACT.md#input-count-limits)も確認してください。
 ファイルサイズ内でも、要求数・期待集合・鍵数の上限は別に適用されます。
+
+選択したtrust・expectationのファイルを読めない、または正しく解析できない場合も、残る材料で可能な
+検査を行います。例えばtrustが利用可能なら、expectationの不足で判明済みの署名不一致を失わせません。
+不足だけなら`INDETERMINATE`、確認できた矛盾があれば`INVALID`です。evidence内の値から信頼鍵や
+期待範囲を補うことはありません。evidence自体を読めない・解析できない場合は入力エラーのままです。
 URL、実資格情報、実行するコードを入力するコマンドではありません。
 
 | 終了コード | 限定された判定 |

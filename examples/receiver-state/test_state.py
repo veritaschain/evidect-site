@@ -311,6 +311,70 @@ class StateTests(unittest.TestCase):
         result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
         self.assertEqual(result["local_status"], "INVALID")
 
+    def test_final_state_read_failure_preserves_evidence_and_error_classification(self):
+        self.adopt()
+        selected = self.store.select("s", "runtime")
+        before = self.store.path.read_bytes()
+        for evidence in ("VALID", "INVALID", "INDETERMINATE"):
+            for code, exit_code in (("STATE_UNAVAILABLE", 2), ("STATE_CORRUPT", 2), ("STREAM_SCOPE_MISMATCH", 1)):
+                for end in (NOW + 1, None):
+                    with self.subTest(evidence=evidence, code=code, end=end):
+                        adapter = AdapterStub(evidence)
+                        samples = iter((NOW, end))
+                        with patch.object(self.store, "select", side_effect=[selected, StateError(code, exit_code)]):
+                            result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report",
+                                                     clock=lambda: next(samples))
+                        expected = "INVALID" if evidence == "INVALID" or exit_code == 1 else "INDETERMINATE"
+                        self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                        self.assertEqual(result["state_reason"], "FINAL_STATE_INVALID" if exit_code == 1
+                                         else "FINAL_STATE_UNAVAILABLE")
+                        self.assertEqual(result["receiver"]["local_status"], evidence)
+                        self.assertEqual(result["completed_at_unix"], end)
+                        self.assertEqual(result["evaluated_at_unix"], NOW)
+                        self.assertEqual(result["checkpoint_sha256"], selected["checkpoint_sha256"])
+                        self.assertEqual(adapter.calls, 1)
+                        json.dumps(result, allow_nan=False)
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_final_clock_failure_preserves_completed_evidence_without_invented_time(self):
+        self.adopt()
+        before = self.store.path.read_bytes()
+        for evidence in ("VALID", "INVALID", "INDETERMINATE"):
+            for end in (None, float("nan"), 253402300800, RuntimeError("private-clock-details")):
+                with self.subTest(evidence=evidence, end=end):
+                    samples = iter((NOW, end))
+                    def clock():
+                        value = next(samples)
+                        if isinstance(value, Exception):
+                            raise value
+                        return value
+                    adapter = AdapterStub(evidence)
+                    result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report", clock=clock)
+                    expected = "INVALID" if evidence == "INVALID" else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["state_reason"], "LOCAL_CLOCK_UNAVAILABLE")
+                    self.assertEqual(result["receiver"]["local_status"], evidence)
+                    self.assertEqual(result["evaluated_at_unix"], NOW)
+                    self.assertIsNone(result["completed_at_unix"])
+                    self.assertEqual(adapter.calls, 1)
+                    self.assertNotIn("private-clock-details", json.dumps(result, allow_nan=False))
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_observed_revocation_survives_unavailable_final_clock(self):
+        self.adopt()
+        after_revoke = []
+        def revoke():
+            self.store.revoke(KEY)
+            after_revoke.append(self.store.path.read_bytes())
+        adapter = AdapterStub(effect=revoke)
+        samples = iter((NOW, None))
+        result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report", clock=lambda: next(samples))
+        self.assertEqual((result["local_status"], result["state_reason"]), ("INVALID", "KEY_REVOKED"))
+        self.assertEqual(result["receiver"]["local_status"], "VALID")
+        self.assertIsNone(result["completed_at_unix"])
+        self.assertEqual(adapter.calls, 1)
+        self.assertEqual(self.store.path.read_bytes(), after_revoke[0])
+
     def test_clock_regression_and_expiry_during_verification(self):
         self.adopt()
         for end, expected in ((NOW - 1, "LOCAL_CLOCK_REGRESSED"), (NOW + 3600, "CHECKPOINT_EXPIRED")):

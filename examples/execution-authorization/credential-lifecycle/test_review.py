@@ -269,6 +269,121 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
                 self.assertEqual(len(after_actions), 1)
                 self.assertEqual(lab.databases(), after_actions[0])
 
+    def assert_final_failure_export(self, mode, *, bad_signature=False, state_failure=None,
+                                    clock_failure=None, revoke=False):
+        name = "-".join(map(str, (mode, bad_signature, state_failure, clock_failure, revoke)))
+        directory = self.root / name
+        directory.mkdir(mode=0o700)
+        lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+        delivery = lab.delivery(); lab.adopt_pair(delivery)
+        if bad_signature:
+            changed = json.loads(delivery["package"])
+            changed["signature"]["signature"] = "0" * 128
+            delivery = {**delivery, "package": f.encode(changed)}
+        original_inputs = copy.deepcopy(delivery)
+        before_db = lab.databases()
+        reads, clocks, checked, actions, exchanges = [], [], [], [], []
+        adapter = lab.adapter_for(delivery)
+
+        class FinalRead:
+            def select(self, *args, **kwargs):
+                reads.append(1)
+                if len(reads) == 2:
+                    if state_failure is not None:
+                        raise f.receiver.StateError("SENSITIVE_FINAL_STATE_FAILURE", state_failure)
+                    if revoke:
+                        lab.store.revoke(delivery["pin"]["key_fingerprint"])
+                        actions.append(lab.databases())
+                return lab.store.select(*args, **kwargs)
+
+        class RecordingAdapter:
+            def verify_delivery(self, *args, **kwargs):
+                result = adapter.verify_delivery(*args, **kwargs)
+                checked.append(copy.deepcopy(result))
+                return result
+
+        def clock():
+            clocks.append(1)
+            if len(clocks) == 2:
+                if clock_failure == "raise":
+                    raise OSError("SENSITIVE_FINAL_CLOCK_FAILURE")
+                if clock_failure == "nonfinite":
+                    return float("nan")
+            return lab.now
+
+        def no_exchange(_query):
+            exchanges.append(1)
+            raise AssertionError("A failed local result must not start a witness exchange")
+
+        args = (FinalRead(), RecordingAdapter(), lab.stream, f.KIND, delivery["package"], delivery["evidence"])
+        if mode == "verify-local":
+            source = f.receiver.verify(*args, clock=clock)
+            state = source
+        else:
+            source = f.witness.verify(*args, lab.selected_trust(), no_exchange, clock=clock)
+            state = source["receiver"]
+            self.assertIsNone(source["query_sha256"])
+            self.assertIsNone(source["signed_witness_response"])
+        expected = "INVALID" if bad_signature or state_failure == 1 or revoke else "INDETERMINATE"
+        reason = ("KEY_REVOKED" if revoke else "FINAL_STATE_INVALID" if state_failure == 1 else
+                  "FINAL_STATE_UNAVAILABLE" if state_failure == 2 else "LOCAL_CLOCK_UNAVAILABLE")
+        self.assertEqual((source["local_status"], source["overall_status"]), (expected, expected))
+        self.assertEqual(state["state_reason"], reason)
+        self.assertEqual(state["evaluated_at_unix"], lab.now)
+        self.assertEqual(state["completed_at_unix"], None if clock_failure else lab.now)
+        self.assertEqual(len(clocks), 2)
+        self.assertEqual(len(checked), 1, "Export must retain the completed check, not rerun without adopted trust")
+        self.assertEqual(state["receiver"], checked[0])
+        original_checks = checked[0]["handoff"]["authentication"]["checks"]
+        signature = next(check for check in original_checks if check["name"] == "signature")
+        self.assertEqual(signature["status"], "INVALID" if bad_signature else "VALID")
+        self.assertEqual(exchanges, [])
+        destination = directory / "review"
+        manifest = review.write_review(destination, source, mode)
+        self.assertEqual({path.name for path in destination.iterdir()}, FILES)
+        raw_source = (destination / "verification.json").read_bytes()
+        self.assertEqual(json.loads(raw_source), source)
+        self.assertNotIn(b"SENSITIVE_", raw_source)
+        projected = json.loads((destination / "review.json").read_bytes())
+        self.assert_headline(projected, expected, expected)
+        self.assertEqual(projected["receipt_checks"], original_checks)
+        self.assertEqual(projected["recorded_time"]["completed_at_unix"], None if clock_failure else lab.now)
+        self.assertEqual(next(layer for layer in projected["layers"] if layer["id"] == "receiver_state")["reason"], reason)
+        self.assert_diagnostic_text(projected, reason)
+        if bad_signature:
+            self.assert_diagnostic_text(projected, "SIGNATURE_OR_KEY_MISMATCH")
+        if clock_failure:
+            self.assertIn("完了: 未記録", (destination / "review.html").read_text())
+            self.assertIn("- 完了: ` 未記録 `", (destination / "review.md").read_text())
+        for filename, entry in manifest["files"].items():
+            raw = (destination / filename).read_bytes()
+            self.assertEqual(entry, {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+        self.assertEqual(lab.databases(), actions[0] if revoke else before_db)
+        self.assertEqual(len(actions), 1 if revoke else 0)
+        self.assertEqual(delivery, original_inputs)
+
+    def test_final_clock_failure_keeps_adopted_receipt_diagnostics_and_unknown_completion(self):
+        for mode in ("verify-local", "verify-witness"):
+            for bad_signature in (False, True):
+                for clock_failure in ("raise", "nonfinite"):
+                    with self.subTest(mode=mode, bad_signature=bad_signature, clock_failure=clock_failure):
+                        self.assert_final_failure_export(mode, bad_signature=bad_signature, clock_failure=clock_failure)
+
+    def test_final_state_failure_keeps_adopted_receipt_diagnostics_with_or_without_completion(self):
+        for mode in ("verify-local", "verify-witness"):
+            for bad_signature in (False, True):
+                for state_failure in (1, 2):
+                    for clock_failure in (None, "raise"):
+                        with self.subTest(mode=mode, bad_signature=bad_signature,
+                                          state_failure=state_failure, clock_failure=clock_failure):
+                            self.assert_final_failure_export(mode, bad_signature=bad_signature,
+                                state_failure=state_failure, clock_failure=clock_failure)
+
+    def test_observed_revocation_keeps_invalid_review_when_final_clock_is_unavailable(self):
+        for mode in ("verify-local", "verify-witness"):
+            with self.subTest(mode=mode):
+                self.assert_final_failure_export(mode, revoke=True, clock_failure="raise")
+
     def test_receiver_rollback_does_not_promote_nested_valid_signatures_or_receipt(self):
         self.assertEqual(self.rollback["receiver"]["receiver"]["credential"]["result"]["evidence_consistency"], "VALID")
         value = review.build_review(self.rollback, "verify-witness")
@@ -348,7 +463,13 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
         conflicting["local_status"], conflicting["overall_status"] = "VALID", "INDETERMINATE"
         independent = copy.deepcopy(self.matched)
         independent["independent_assessment"] = True
-        for value in (bad_format, promoted, conflicting, independent):
+        missing_completion = copy.deepcopy(self.matched)
+        missing_completion["receiver"]["completed_at_unix"] = None
+        invented_completion = copy.deepcopy(self.matched)
+        invented_completion["local_status"] = "INDETERMINATE"
+        invented_completion["receiver"]["local_status"] = "INDETERMINATE"
+        invented_completion["receiver"]["state_reason"] = "LOCAL_CLOCK_UNAVAILABLE"
+        for value in (bad_format, promoted, conflicting, independent, missing_completion, invented_completion):
             with self.subTest(kind=value["format"], status=value["overall_status"]):
                 with self.assertRaises(ValueError):
                     review.build_review(value, "verify-witness")

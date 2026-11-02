@@ -6,12 +6,21 @@ import { record, need } from './protocol.mjs';
 import { verifyCredentialEvidence, EXPECTATION_FORMAT } from './offline.mjs';
 
 export function verifyOfflineFiles(evidencePath, trustPath, expectationPath) {
-  const evidence = readBoundedJSON(evidencePath), trust = readBoundedJSON(trustPath);
-  const expectation = readBoundedJSON(expectationPath);
-  record(expectation, ['format', 'contextId', 'requestDigests']);
-  need(expectation.format === EXPECTATION_FORMAT);
-  return verifyCredentialEvidence({ evidence, trust, expectedContextId: expectation.contextId,
-    expectedRequestDigests: expectation.requestDigests });
+  const evidence = readBoundedJSON(evidencePath);
+  let trust = null, expectedContextId, expectedRequestDigests;
+  // Unavailable selected configuration cannot erase contradictions that the
+  // remaining original inputs can establish. Never infer trust or scope from
+  // the evidence; the pure verifier reports each unavailable prerequisite.
+  try { trust = readBoundedJSON(trustPath); }
+  catch { /* Leave selected trust unavailable. */ }
+  try {
+    const expectation = readBoundedJSON(expectationPath);
+    record(expectation, ['format', 'contextId', 'requestDigests']);
+    need(expectation.format === EXPECTATION_FORMAT);
+    expectedContextId = expectation.contextId;
+    expectedRequestDigests = expectation.requestDigests;
+  } catch { /* Leave the selected context and inventory unavailable. */ }
+  return verifyCredentialEvidence({ evidence, trust, expectedContextId, expectedRequestDigests });
 }
 
 export const verificationExitCode = result => result.evidence_consistency === 'VALID' ? 0

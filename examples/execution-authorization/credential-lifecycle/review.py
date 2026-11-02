@@ -232,10 +232,19 @@ def _state(value):
     _flags(value); _statuses(value)
     _need(type(value["store_id"]) is str and re.fullmatch(r"[0-9a-f]{32}", value["store_id"]) is not None)
     _need(_integer(value["state_revision"]) and _integer(value["generation"], minimum=1) and _hash_value(value["checkpoint_sha256"]))
-    _need(all(_integer(value[k], maximum=253402300799) for k in ("evaluated_at_unix", "completed_at_unix")) and value["clock"] == "LOCAL_UNATTESTED")
+    _need(_integer(value["evaluated_at_unix"], maximum=253402300799) and value["clock"] == "LOCAL_UNATTESTED")
     policies = {"CURRENT_LOCAL_SELECTION": "VALID", "KEY_REVOKED": "INVALID", "STATE_CHANGED_DURING_VERIFICATION": "INDETERMINATE",
-                "LOCAL_CLOCK_REGRESSED": "INDETERMINATE", "CHECKPOINT_EXPIRED": "INDETERMINATE"}
+                "LOCAL_CLOCK_REGRESSED": "INDETERMINATE", "CHECKPOINT_EXPIRED": "INDETERMINATE",
+                "FINAL_STATE_UNAVAILABLE": "INDETERMINATE", "FINAL_STATE_INVALID": "INVALID",
+                "LOCAL_CLOCK_UNAVAILABLE": "INDETERMINATE"}
     _need(value["state_reason"] in policies)
+    # A failed final clock sample is unknown, not a replacement timestamp. A
+    # stronger already-observed state problem can remain the primary reason.
+    missing_end = value["completed_at_unix"] is None
+    _need((missing_end and value["state_reason"] in ("KEY_REVOKED", "STATE_CHANGED_DURING_VERIFICATION",
+           "FINAL_STATE_UNAVAILABLE", "FINAL_STATE_INVALID", "LOCAL_CLOCK_UNAVAILABLE")) or
+          _integer(value["completed_at_unix"], maximum=253402300799))
+    _need(value["state_reason"] != "LOCAL_CLOCK_UNAVAILABLE" or missing_end)
     children = [policies[value["state_reason"]]]
     if value["receiver"] is None:
         _need(value["state_reason"] == "KEY_REVOKED")

@@ -64,6 +64,13 @@ python3 -I -B examples/receiver-state/receiver.py revoke \
 
 上位レポートは`evidect-stateful-receiver/1`。runtime/routingの元の`receiver/2`、またはcredential用の`evidect-credential-receiver/1`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
 
+元の検証を完了した後に最終状態の読取りや時計の取得が失敗しても、その検証結果を保持します。
+最終状態を確認できなければ`FINAL_STATE_UNAVAILABLE`、読取りで明確なスコープ不一致を確認した場合は
+`FINAL_STATE_INVALID`です。時計を取得できない場合は`LOCAL_CLOCK_UNAVAILABLE`を返しますが、
+すでに確認した鍵失効等の状態理由があれば、それを優先します。どの場合も既知の`INVALID`を失わせず、
+不足しか判明していない場合は`INDETERMINATE`です。最終時計を取得できなかった結果では
+`completed_at_unix`を`null`とし、開始時刻等で補いません。最終状態の読取り失敗は、最新状態の確認成功を意味しません。
+
 **DB全体の巻き戻し、同じOSユーザーや管理者による改変、失われたDBの正当な復旧、世界全体の最新世代、独立した時刻証明は扱いません。** 保存されたDBそのものが古い状態へ戻れば、世代と失効記録も一緒に戻ります。これを負の対照として試験します。ローカル時計の検証中の後退は検出しますが、過去に設定された時計や外部時刻とのずれは検出できません。
 
 SQLiteの読み取り直しは、最終読取り時点までのローカル状態を確認するものです。結果の出力後に起きる失効を自動反映せず、継続的な安全性や実行許可を証明しません。original authority・観測の真実性・本番運用・独立評価は成立していません。管理策全体と法令適合性も`NOT_ASSESSED`です。
