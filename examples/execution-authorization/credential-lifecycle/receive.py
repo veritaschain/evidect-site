@@ -89,7 +89,12 @@ def main(argv=None):
         elif args.command == "verify-local":
             result = base.verify(store, adapter, args.stream, "credential", package, evidence)
         else:
-            selected_witness = witness.parse(handoff.auth.read_bytes(args.witness_trust, witness.LIMIT))
+            try:
+                selected_witness = witness.parse(handoff.auth.read_bytes(args.witness_trust, witness.LIMIT))
+            except (OSError, ValueError, TypeError, RecursionError):
+                # Unavailable witness configuration must not bypass verification
+                # against the receiver's adopted key, checkpoint and revocations.
+                selected_witness = None
             # The fixed test child reads its key. The receiver does not import it.
             # This is intentionally not an independent-host network transport.
             witness_id = selected_witness.get("witness_id") if type(selected_witness) is dict else None

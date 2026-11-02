@@ -225,6 +225,16 @@ credential, invoke a provider or approve execution. Missing witness state, lag, 
 state changes cannot fall back to local success. Known evidence or state contradictions remain
 `INVALID`. A fully matching local check still has `overall_status: INDETERMINATE`.
 
+If the selected witness trust file cannot be read or parsed, the CLI preserves stateful receiver
+verification when the original inputs and adopted state remain available. The witness side remains
+`INDETERMINATE`; established receipt/key mismatches or receiver revocation remain `INVALID`.
+
+State rereads check revocation of the receipt signer actually used for this verification, including
+when a newer key has since been adopted. Observed revocation takes precedence over a selection
+change or checkpoint expiry, including at the final receiver-state read in witness verification.
+A selection change alone remains `INDETERMINATE`. These checks do not observe later changes or
+establish continuous validity after the final read.
+
 The witness uses a separate local database, child process and signing key under the same OS user
 and controller. The fixed test transport is not an independent host or authenticated production
 service. Receiver-only rollback can be detected against a newer witness selection; simultaneous

@@ -94,7 +94,9 @@ def query(raw):
 
 
 def trust(value):
-    exact(value, ("format", "witness_id", "store_id", "public_key", "max_round_trip_ms"))
+    # Selected configuration is a prerequisite, not evidence of a contradiction.
+    if type(value) is not dict or set(value) != {"format", "witness_id", "store_id", "public_key", "max_round_trip_ms"}:
+        raise WitnessError("WITNESS_TRUST_INVALID")
     if value["format"] != TRUST or not matches(LABEL, value["witness_id"]) or not matches(STORE_ID, value["store_id"]) or not (
             type(value["public_key"]) is str and 0 < len(value["public_key"]) <= 8192 and
             "PRIVATE KEY" not in value["public_key"] and integer(value["max_round_trip_ms"], 1) and
@@ -129,12 +131,27 @@ def crypto(operation, payload, key, signature=None):
 
 def snapshot(store, stream, kind):
     selected = store.select(stream, kind)
+    return _snapshot(selected)
+
+
+def _snapshot(selected):
     # Store.select checks the checkpoint shape and stored commitment internally.
     value = {"store_id": selected["store_id"], "revision": selected["revision"], "kind": selected["kind"],
              "generation": selected["generation"], "checkpoint_sha256": selected["checkpoint_sha256"],
              "signer_fingerprint": selected["checkpoint"]["key_fingerprint"], "revoked": selected["revoked"]}
     validate_snapshot(value)
     return value
+
+
+def _current_receiver(store, stream, kind, original):
+    # Check the key actually used, even if a later adoption selects a new one.
+    # Selection and revocation come from the same read transaction.
+    selected = store.select(stream, kind, checked_fingerprint=original["signer_fingerprint"])
+    if selected["checked_key_revoked"]:
+        raise WitnessError("RECEIVER_SIGNER_REVOKED", "INVALID")
+    if _snapshot(selected) != original:
+        raise WitnessError("RECEIVER_STATE_CHANGED")
+    return selected
 
 
 def validate_snapshot(value):
@@ -235,11 +252,7 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
         if signed["key_fingerprint"] == local["signer_fingerprint"]:
             raise WitnessError("WITNESS_AND_RECEIPT_KEY_NOT_SEPARATE", "INVALID")
         status, reason = _comparison(local, witnessed)
-        current = snapshot(store, stream, kind)
-        if current != local:
-            if current["revoked"] and current["signer_fingerprint"] == local["signer_fingerprint"]:
-                raise WitnessError("RECEIVER_SIGNER_REVOKED", "INVALID")
-            raise WitnessError("RECEIVER_STATE_CHANGED")
+        _current_receiver(store, stream, kind, local)
         ended = _elapsed(monotonic)
         measured = (ended - started) * 1000
         # Injected finite clocks can overflow during conversion to milliseconds.
@@ -250,13 +263,11 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
         if ended < started or duration > expected["max_round_trip_ms"]:
             raise WitnessError("WITNESS_ROUND_TRIP_EXPIRED")
         finished = base.sample_time(clock)
-        selected = store.select(stream, kind)
+        selected = _current_receiver(store, stream, kind, local)
         if finished < evidence["completed_at_unix"]:
             raise WitnessError("LOCAL_CLOCK_REGRESSED")
         if finished >= selected["checkpoint"]["expires_at"]:
             raise WitnessError("CHECKPOINT_EXPIRED")
-        if snapshot(store, stream, kind) != local:
-            raise WitnessError("RECEIVER_STATE_CHANGED")
     except WitnessError as error:
         # A stale/failed freshness check cannot turn a known conflict into success.
         if status != "INVALID":

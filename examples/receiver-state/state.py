@@ -217,8 +217,10 @@ class Store:
             db.commit()
             return result
 
-    def select(self, stream, kind):
+    def select(self, stream, kind, *, checked_fingerprint=None):
         identity(stream, kind)
+        if checked_fingerprint is not None and not fingerprint(checked_fingerprint):
+            raise StateError("KEY_FINGERPRINT_INVALID")
         with self._connection(write=False) as db:
             db.execute("BEGIN")
             meta = self._meta(db)
@@ -232,5 +234,11 @@ class Store:
             if row[1] != pin["context"]["generation"] or row[2] != lineage or row[4] != digest(pin):
                 raise StateError("STATE_CORRUPT")
             revoked = db.execute("SELECT 1 FROM revoked WHERE fingerprint=?", (pin["key_fingerprint"],)).fetchone() is not None
-            return {**meta, "kind": kind, "generation": row[1], "checkpoint": pin,
-                    "checkpoint_sha256": row[4], "public_key": row[5], "revoked": revoked}
+            selected = {**meta, "kind": kind, "generation": row[1], "checkpoint": pin,
+                        "checkpoint_sha256": row[4], "public_key": row[5], "revoked": revoked}
+            if checked_fingerprint is not None:
+                # Check the key used by an in-flight verifier even if another
+                # key has since been adopted. Both reads share this snapshot.
+                selected["checked_key_revoked"] = db.execute("SELECT 1 FROM revoked WHERE fingerprint=?",
+                                                             (checked_fingerprint,)).fetchone() is not None
+            return selected

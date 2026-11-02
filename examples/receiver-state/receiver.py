@@ -103,10 +103,10 @@ def verify(store, adapter, stream, kind, package, report, *, clock=time.time):
     checked = _invoke(adapter, package, report, selected["public_key"], selected["checkpoint"], start, kind)
     # Use a new transaction after crypto/semantic verification. Do not compare
     # against the original read transaction, which would retain its old snapshot.
-    current = store.select(stream, kind)
+    current = store.select(stream, kind, checked_fingerprint=selected["checkpoint"]["key_fingerprint"])
     end = sample_time(clock)
     reason, policy = "CURRENT_LOCAL_SELECTION", "VALID"
-    if current["revoked"] and current["checkpoint"]["key_fingerprint"] == selected["checkpoint"]["key_fingerprint"]:
+    if current["checked_key_revoked"]:
         reason, policy = "KEY_REVOKED", "INVALID"
     elif (current["store_id"], current["revision"]) != (selected["store_id"], selected["revision"]):
         reason, policy = "STATE_CHANGED_DURING_VERIFICATION", "INDETERMINATE"

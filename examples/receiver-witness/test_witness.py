@@ -21,11 +21,16 @@ def pair():
 
 class FakeStore:
     def __init__(self, store_id):
+        self.revoked_fingerprints = set()
         self.selected = {"store_id": store_id, "revision": 1, "kind": "runtime", "generation": 2,
             "checkpoint_sha256": "a" * 64, "checkpoint": {"key_fingerprint": "b" * 64, "expires_at": 2000},
             "revoked": False}
-    def select(self, stream, kind):
-        return copy.deepcopy(self.selected)
+    def select(self, stream, kind, *, checked_fingerprint=None):
+        value = copy.deepcopy(self.selected)
+        if checked_fingerprint is not None:
+            value["checked_key_revoked"] = checked_fingerprint in self.revoked_fingerprints or (
+                value["revoked"] and value["checkpoint"]["key_fingerprint"] == checked_fingerprint)
+        return value
 
 
 class WitnessTests(unittest.TestCase):
@@ -188,6 +193,50 @@ class WitnessTests(unittest.TestCase):
             return response
         self.assertEqual(self.check(exchange)["witness_reason"], "RECEIVER_SIGNER_REVOKED")
 
+    def test_used_key_revocation_is_not_hidden_by_a_new_selection(self):
+        for revoked in (False, True):
+            with self.subTest(used_key_revoked=revoked):
+                self.local = FakeStore("1" * 32)
+
+                def exchange(q):
+                    response = self.reply(q)
+                    if revoked:
+                        self.local.revoked_fingerprints.add(self.local.selected["checkpoint"]["key_fingerprint"])
+                    self.local.selected.update(revision=2, generation=3, checkpoint_sha256="d" * 64)
+                    self.local.selected["checkpoint"]["key_fingerprint"] = "c" * 64
+                    return response
+
+                result = self.check(exchange)
+                expected = "INVALID" if revoked else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["witness_reason"], "RECEIVER_SIGNER_REVOKED" if revoked else "RECEIVER_STATE_CHANGED")
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["signed_witness_response"])
+
+    def test_revocation_after_response_checks_precedes_expiry(self):
+        for phase in ("duration_end", "final_time"):
+            with self.subTest(phase=phase):
+                self.local = FakeStore("1" * 32)
+                ticks = []
+
+                def monotonic():
+                    ticks.append(1)
+                    if phase == "duration_end" and len(ticks) == 2:
+                        self.local.selected["revoked"] = True
+                    return float(len(ticks))
+
+                def finish(_clock):
+                    if phase == "final_time":
+                        self.local.selected["revoked"] = True
+                    return self.local.selected["checkpoint"]["expires_at"]
+
+                self.base.sample_time = finish
+                result = self.check(monotonic=monotonic)
+                self.assertEqual((result["local_status"], result["witness_reason"]), ("INVALID", "RECEIVER_SIGNER_REVOKED"))
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["signed_witness_response"])
+                self.assertEqual(result["round_trip_ms"], 1000)
+
     def test_witness_mutation_during_signing_is_not_served(self):
         original = w.crypto
         def mutate(*args, **kwargs):
@@ -275,7 +324,10 @@ class WitnessTests(unittest.TestCase):
         for value in (None, {}, {**self.trust, "max_round_trip_ms": True}, {**self.trust, "max_round_trip_ms": 30001}):
             self.trust = value
             result = self.check(lambda _: self.fail("unusable trust must not make request"))
-            self.assertNotEqual(result["local_status"], "VALID")
+            self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                             ("INDETERMINATE", "INDETERMINATE", "INDETERMINATE"))
+            self.assertEqual(result["witness_reason"], "WITNESS_TRUST_INVALID")
+            self.assertIsNone(result["query_sha256"])
 
     def test_same_store_identity_is_not_a_separate_witness(self):
         self.trust["store_id"] = self.local.selected["store_id"]

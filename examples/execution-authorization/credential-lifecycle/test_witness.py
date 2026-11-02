@@ -299,8 +299,77 @@ class CredentialWitnessTests(unittest.TestCase):
             "--witness-test-private-key", str(self.lab.key_path)])
         self.assertEqual(result.returncode, 1)
         self.assertEqual(report["local_status"], "INVALID")
-        self.assertEqual(report["receiver"]["credential"]["result"]["evidence_consistency"], "INVALID")
+        self.assertEqual(report["format"], "evidect-witness-receiver/1")
+        self.assertEqual(report["receiver"]["receiver"]["credential"]["result"]["evidence_consistency"], "INVALID")
         self.assertFalse(missing_trust.exists())
+
+    def assert_cli_preserves_selection_without_witness_configuration(self, delivery, *, state_status, state_reason,
+                                                                   receipt_signature_invalid=False):
+        paths = self.write_cli_inputs(delivery)
+        missing = self.lab.root / "missing-witness-trust.json"
+        malformed = self.lab.root / "malformed-witness-trust.json"
+        f.write_owned(malformed, b'{"witness_id":"UNTRUSTED_CONFIGURATION_MARKER",')
+        before = self.lab.databases()
+        selected_before = {name: path.read_bytes() for name, path in paths.items()}
+        malformed_before = malformed.read_bytes()
+        expected = "INVALID" if state_status == "INVALID" else "INDETERMINATE"
+        for trust_path in (missing, malformed):
+            with self.subTest(witness_configuration=trust_path.name):
+                output = self.lab.root / (trust_path.stem + "-review")
+                process, report = self.cli("verify-witness", paths, extra=["--witness-trust", str(trust_path),
+                    "--witness-test-state-dir", str(self.lab.witness_store.directory),
+                    "--witness-test-private-key", str(self.lab.key_path), "--output", str(output)])
+                self.assertEqual(process.returncode, 1 if expected == "INVALID" else 2)
+                self.assertEqual(process.stderr, b"")
+                self.assertEqual(report["format"], "evidect-witness-receiver/1")
+                self.assertEqual((report["local_status"], report["overall_status"]), (expected, expected))
+                self.assertEqual((report["witness_status"], report["witness_reason"]),
+                                 ("INDETERMINATE", "WITNESS_TRUST_INVALID"))
+                self.assertIsNone(report["query_sha256"])
+                self.assertIsNone(report["signed_witness_response"])
+                state = report["receiver"]
+                self.assertEqual((state["local_status"], state["state_reason"]), (state_status, state_reason))
+                if state_reason == "KEY_REVOKED":
+                    self.assertIsNone(state["receiver"])
+                else:
+                    inner = state["receiver"]
+                    self.assertEqual(inner["credential"]["result"]["evidence_consistency"], "VALID")
+                    signature = next(check for check in inner["handoff"]["authentication"]["checks"]
+                                     if check["name"] == "signature")
+                    self.assertEqual(signature["status"], "INVALID" if receipt_signature_invalid else "VALID")
+                    if receipt_signature_invalid:
+                        self.assertEqual(signature["reason"], "SIGNATURE_OR_KEY_MISMATCH")
+                self.assertEqual({path.name for path in output.iterdir()},
+                                 {"verification.json", "review.json", "review.html", "review.md", "manifest.json"})
+                self.assertEqual(json.loads((output / "verification.json").read_bytes()), report)
+                projected = json.loads((output / "review.json").read_bytes())
+                self.assertEqual((projected["local_status"], projected["overall_status"]), (expected, expected))
+                self.assertEqual(self.lab.databases(), before)
+                self.assertEqual({name: path.read_bytes() for name, path in paths.items()}, selected_before)
+                self.assertEqual(malformed.read_bytes(), malformed_before)
+                self.assertFalse(missing.exists())
+                self.assertNotIn(str(trust_path).encode(), process.stdout)
+                self.assertNotIn(b"UNTRUSTED_CONFIGURATION_MARKER", process.stdout)
+                self.assert_limits(report)
+
+    def test_cli_missing_or_malformed_witness_configuration_keeps_matching_local_evidence_unresolved(self):
+        self.assert_cli_preserves_selection_without_witness_configuration(
+            self.pair(), state_status="VALID", state_reason="CURRENT_LOCAL_SELECTION")
+
+    def test_cli_missing_or_malformed_witness_configuration_preserves_receipt_signature_mismatch(self):
+        delivery = self.pair()
+        package = json.loads(delivery["package"])
+        signature = package["signature"]["signature"]
+        package["signature"]["signature"] = ("a" if signature[0] != "a" else "b") + signature[1:]
+        self.assert_cli_preserves_selection_without_witness_configuration(
+            {**delivery, "package": f.encode(package)}, state_status="INVALID", state_reason="CURRENT_LOCAL_SELECTION",
+            receipt_signature_invalid=True)
+
+    def test_cli_missing_or_malformed_witness_configuration_preserves_adopted_signer_revocation(self):
+        delivery = self.pair()
+        self.lab.store.revoke(delivery["pin"]["key_fingerprint"])
+        self.assert_cli_preserves_selection_without_witness_configuration(
+            delivery, state_status="INVALID", state_reason="KEY_REVOKED")
 
 
 if __name__ == "__main__":

@@ -98,6 +98,10 @@ DBの作成とreceipt署名鍵の失効には、既存の[receiver-state CLI](..
 `verify-local`と`verify-witness`は読取り専用で、checkpointの自動採用、DBの自動復旧、provider呼出し、
 資格情報発行、実行許可を行いません。
 
+指定したwitness trustファイルが読取不能または不正JSONでも、元入力と受領者状態を読み取れる場合は、
+保存済みのreceipt鍵・checkpoint・失効状態を使った受取検証を保持します。witness側は未確定のままで、
+受取側で確認できた署名・鍵の不一致や失効による`INVALID`を失わせません。
+
 `--witness-test-private-key`は固定された子プロセス用の試験鍵の場所です。受領者自身はその秘密鍵を読みません。
 この伝送は同じOSユーザーのローカル試験用で、独立ホストや本番の認証済み通信ではありません。
 demoが出力する保存資料には、この秘密鍵や稼働中のwitness DBは含まれません。
@@ -156,9 +160,14 @@ demo summaryの`witness_integrated: true`は、このローカル接続を実行
 |---|---|
 | 必要な各照合が成立 | 限定された`local_status: VALID`、総合は`INDETERMINATE` |
 | 署名・3入力の対応・採用状態等に既知の矛盾 | `INVALID` |
+| 今回の受取検証に使ったreceipt鍵の失効を、後続の状態読取で確認 | 新しい鍵が採用されていても`INVALID` |
 | witnessの停止・不足・遅延・古い選択・途中の状態更新等 | `INDETERMINATE`。既知の矛盾があれば`INVALID`を維持 |
 | 受領者DBだけを復元し、witnessに新しい選択が残る | 古い受領者の選択を拒否 |
 | 両DBを同じ古い状態へ復元 | 一致してしまう負の対照。`both_stores_rollback: NOT_DETECTED` |
+
+失効の確認は、今回の検証に使ったreceipt署名鍵を基準にします。witness照合の最終読取でも、その失効を
+確認した場合は選択変更や期限切れによる未確定より`INVALID`を優先します。失効を伴わない選択変更は
+`INDETERMINATE`で、最終読取後の変更を継続的に監視するものではありません。
 
 終了コードは限定的な`VALID`が0、既知の矛盾による`INVALID`が1です。
 材料・状態・検証手段が不足する場合は2で、不正入力でも既知の矛盾が成立すれば1になります。

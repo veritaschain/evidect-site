@@ -206,6 +206,69 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
                     self.assertEqual(json.loads(f.encode(source)), source)
                     self.assert_headline(review.build_review(source, "verify-witness"), expected, expected)
 
+    def test_observed_used_key_revocation_survives_rotation_late_reads_and_review_export(self):
+        rotated_key = f.keypair()
+        for phase in ("exchange_rotation", "duration_end", "final_clock", "final_clock_and_expiry"):
+            with self.subTest(phase=phase):
+                directory = self.root / phase
+                directory.mkdir(mode=0o700)
+                lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+                delivery = lab.delivery(); lab.adopt_pair(delivery)
+                rotated = lab.delivery(2, receipt_key=rotated_key) if phase == "exchange_rotation" else None
+                transport = lab.transport()
+                after_actions, ticks, clocks = [], [], []
+
+                def revoke_used_key():
+                    lab.store.revoke(delivery["pin"]["key_fingerprint"])
+                    if rotated is not None:
+                        self.assertEqual(lab.adopt_to(lab.store, rotated)["local_status"], "VALID")
+                    after_actions.append(lab.databases())
+
+                def exchange(query):
+                    response = transport(query)
+                    if phase == "exchange_rotation":
+                        revoke_used_key()
+                    return response
+
+                def monotonic():
+                    ticks.append(1)
+                    if phase == "duration_end" and len(ticks) == 2:
+                        revoke_used_key()
+                    return float(len(ticks))
+
+                def clock():
+                    clocks.append(1)
+                    if phase.startswith("final_clock") and len(clocks) == 3:
+                        revoke_used_key()
+                        if phase == "final_clock_and_expiry":
+                            return delivery["pin"]["expires_at"]
+                    return lab.now
+
+                source = f.witness.verify(lab.store, lab.adapter_for(delivery), lab.stream, f.KIND,
+                    delivery["package"], delivery["evidence"], lab.selected_trust(), exchange,
+                    clock=clock, monotonic=monotonic)
+                self.assertEqual((source["local_status"], source["overall_status"], source["witness_status"]),
+                                 ("INVALID", "INVALID", "INVALID"))
+                self.assertEqual(source["witness_reason"], "RECEIVER_SIGNER_REVOKED")
+                self.assertEqual(source["receiver"]["local_status"], "VALID")
+                self.assertEqual(source["receiver"]["generation"], 1)
+                self.assertIsNotNone(source["signed_witness_response"])
+                selected = lab.store.select(lab.stream, f.KIND, checked_fingerprint=delivery["pin"]["key_fingerprint"])
+                self.assertIs(selected["checked_key_revoked"], True)
+                self.assertEqual(selected["generation"], 2 if rotated is not None else 1)
+                self.assertEqual(selected["revoked"], rotated is None)
+                destination = directory / "review"
+                manifest = review.write_review(destination, source, "verify-witness")
+                self.assertEqual({path.name for path in destination.iterdir()}, FILES)
+                self.assertEqual(json.loads((destination / "verification.json").read_bytes()), source)
+                self.assertEqual(manifest["overall_status"], "INVALID")
+                projected = json.loads((destination / "review.json").read_bytes())
+                self.assert_headline(projected, "INVALID", "INVALID")
+                layer = next(row for row in projected["layers"] if row["id"] == "witness")
+                self.assertEqual(layer["reason"], "RECEIVER_SIGNER_REVOKED")
+                self.assertEqual(len(after_actions), 1)
+                self.assertEqual(lab.databases(), after_actions[0])
+
     def test_receiver_rollback_does_not_promote_nested_valid_signatures_or_receipt(self):
         self.assertEqual(self.rollback["receiver"]["receiver"]["credential"]["result"]["evidence_consistency"], "VALID")
         value = review.build_review(self.rollback, "verify-witness")

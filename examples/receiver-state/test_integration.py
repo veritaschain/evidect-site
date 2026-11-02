@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 
 HERE = Path(__file__).resolve().parent
@@ -108,6 +109,38 @@ class IntegrationTests(unittest.TestCase):
         self.adopt("routing", rotated)
         self.assertEqual(self.verify("routing", rotated)["local_status"], "VALID")
         self.assertEqual(self.verify("routing", first)["local_status"], "INVALID")
+
+    def test_used_signer_revocation_survives_new_key_adoption_during_verification(self):
+        for kind in self.adapters:
+            for revoke_used_key in (False, True):
+                with self.subTest(kind=kind, revoke_used_key=revoke_used_key):
+                    self.store = receiver.Store.create(self.base / (kind + "-" + str(revoke_used_key)))
+                    first, rotated = self.delivery(kind), self.delivery(kind, 2, 1)
+                    self.adopt(kind, first)
+                    after_actions = []
+
+                    def verify_then_rotate(*args, **kwargs):
+                        checked = self.adapters[kind].verify_delivery(*args, **kwargs)
+                        self.assertEqual(checked["local_status"], "VALID")
+                        if revoke_used_key:
+                            self.store.revoke(first["pin"]["key_fingerprint"])
+                        self.assertEqual(self.adopt(kind, rotated)["local_status"], "VALID")
+                        after_actions.append(self.store.path.read_bytes())
+                        return checked
+
+                    result = receiver.verify(self.store, SimpleNamespace(verify_delivery=verify_then_rotate),
+                        kind, kind, first["package"], first["report"], clock=lambda: self.now)
+                    expected = "INVALID" if revoke_used_key else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["state_reason"], "KEY_REVOKED" if revoke_used_key
+                                     else "STATE_CHANGED_DURING_VERIFICATION")
+                    self.assertEqual(result["receiver"]["local_status"], "VALID")
+                    self.assertEqual(result["generation"], 1)
+                    selected = self.store.select(kind, kind, checked_fingerprint=first["pin"]["key_fingerprint"])
+                    self.assertEqual(selected["generation"], 2)
+                    self.assertIs(selected["revoked"], False)
+                    self.assertIs(selected["checked_key_revoked"], revoke_used_key)
+                    self.assertEqual(self.store.path.read_bytes(), after_actions[0])
 
     def test_invalid_signature_cannot_poison_saved_generation(self):
         first = self.delivery("runtime")

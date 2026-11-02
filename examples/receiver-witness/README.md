@@ -60,7 +60,7 @@ python3 -I -B examples/receiver-witness/test_integration.py -v
 
 **両DBを一緒に戻した負の対照では、チャレンジに対する新しい署名を生成しても、古い状態同士が一致してローカル検証は通ります。** この限界は`both_stores_rollback: NOT_DETECTED`で明示します。witnessの侵害、虚偽応答、split view、世界全体の最新状態も検出保証しません。
 
-nonceは今回の照合要求との結び付けであり、UTC時刻証明ではありません。往復時間はローカルmonotonic時計で測定し、checkpointの期限は従来のローカル時計に依存します。応答直後の更新・失効は自動反映されず、連続的な有効性や実行許可を意味しません。
+nonceは今回の照合要求との結び付けであり、UTC時刻証明ではありません。往復時間はローカルmonotonic時計で測定し、checkpointの期限は従来のローカル時計に依存します。witness側は応答後、受取側は最終状態読取後の更新・失効を自動反映せず、連続的な有効性や実行許可を意味しません。
 
 結果は`evidect-witness-receiver/1`。署名されるのはwitness応答であり、上位レポート全体ではありません。既存受取結果は`receiver`に保持しますが、上位が`INVALID`／`INDETERMINATE`なら内側の`VALID`だけを抜き出して成功としてはいけません。`overall_status`、本番運用、独立評価、原権限、観測の真実性、法令適合について従来の留保を維持します。
 

@@ -204,6 +204,31 @@ class StateTests(unittest.TestCase):
         self.assertEqual(self.store.select("s", "runtime"), self.store.select("s", "runtime"))
         self.assertEqual(before, self.store.path.read_bytes())
 
+    def test_checked_signer_revocation_is_separate_and_read_only(self):
+        self.adopt()
+        self.store.revoke(KEY)
+        self.adopt(pin(2, key="c" * 64), public="TEST-ONLY-NEW-PUBLIC-KEY")
+        before = self.store.path.read_bytes()
+        current = self.store.select("s", "runtime")
+        self.assertIs(current["revoked"], False)
+        self.assertNotIn("checked_key_revoked", current)
+        self.assertEqual(self.store.select("s", "runtime", checked_fingerprint=None), current)
+        for selected_key, expected in ((KEY, True), ("c" * 64, False), ("d" * 64, False)):
+            with self.subTest(fingerprint=selected_key):
+                selected = self.store.select("s", "runtime", checked_fingerprint=selected_key)
+                self.assertIs(selected.pop("checked_key_revoked"), expected)
+                self.assertEqual(selected, current)
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_checked_signer_fingerprint_is_strict(self):
+        self.adopt()
+        before = self.store.path.read_bytes()
+        for value in (True, 1, b"a" * 64, "", "a" * 63, "a" * 65, "A" * 64, "g" * 64):
+            with self.subTest(value=value):
+                self.assert_code("KEY_FINGERPRINT_INVALID", self.store.select,
+                                 "s", "runtime", checked_fingerprint=value)
+        self.assertEqual(self.store.path.read_bytes(), before)
+
     def test_concurrent_adoption_never_ends_at_older_generation(self):
         ctx = multiprocessing.get_context("spawn")
         ready, queue = ctx.Event(), ctx.Queue()
