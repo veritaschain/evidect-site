@@ -4,7 +4,7 @@
 
 ## Authority and binding
 
-The existing execution gate remains unchanged. Its only internal action is `append_marker`.
+The execution gate's only internal action remains `append_marker`.
 A marker records that this gate executed its own harmless operation; it does not establish a
 credential was issued, an API was invoked, or a provider accepted an operation.
 
@@ -25,8 +25,9 @@ callbacks, paths, or caller-supplied trust keys are not operation arguments.
 
 ## Credential state
 
-Opaque references and synthetic token values are separate. Output contains references and scoped
-metadata, never token values, private signing keys, or dumps of environment variables.
+Opaque references and synthetic token values are separate. Credential outputs contain references and
+scoped metadata, never token values, private signing keys, or dumps of environment variables.
+Opt-in signed-input retention also preserves the signed instruction text, as described below.
 
 The provider maintains distinct parent and derived credential records. Revoking a parent blocks
 new issuance from that parent; previously issued sessions can retain their own validity under the
@@ -81,9 +82,80 @@ An `AVAILABLE` observation means the adapter currently returns records. It does 
 history is complete. Re-enabling logging does not restore operations missed while it was disabled.
 
 The experiment records operation metadata, request/approval verification outcomes, and scoped
-observations of effects. The aggregate report does not retain the original request and approval
-envelopes for offline reverification. It does not infer a model's hidden intent, authenticate an
-attacker's identity, or recreate an incident.
+observations of effects. Retaining original signed inputs is an explicit option. Neither retention nor
+correlation infers a model's hidden intent, authenticates an attacker's identity, or recreates an incident.
+
+## Correlation scope and identifiers
+
+Context identifies the scope in which trust and records are compared. A request digest binds a
+request's signed payload; it is distinct from a wrapper dispatch identifier and a provider record
+identifier. An identifier's presence does not establish that a dispatch or effect occurred. Repeated
+submission of one request must remain distinguishable from separate requests and provider attempts.
+
+The fixture binds `contextId` into the signed `taskId` and `nonce`. The wrapper issues `dispatch_id`
+immediately before dispatch; the mock provider issues its own `providerRequestId` on invocation.
+Provider IDs are interpreted within the expected `providerId` and `providerInstanceId` namespace.
+A rejected replay creates no new dispatch or provider invocation ID.
+
+The verifier receives the expected scope separately from the evidence. It must not derive an approved
+scope solely from whatever records arrived. Fixture key names can repeat across contexts, so a key
+name alone cannot join records or select trust across cases.
+
+Correlation operates on the supplied records. Unmatched records, duplicate or conflicting references,
+and unavailable observations must not be silently collapsed into a successful match. The private
+harness oracle does not fill gaps in the provider audit. Matching unsigned provider metadata to a
+signed request does not authenticate that metadata or establish the completeness of provider history.
+Correlation reports `CONSISTENT`, `INVALID` or `INDETERMINATE`. A unique audit-only match after a lost
+response is labeled `OBSERVATION_ONLY`; it does not change `FAILED_EFFECT_POSSIBLE` into successful execution.
+
+## Retained inputs and offline verification
+
+`retainSignedInputs` defaults to false. The synthetic fixture explicitly enables it to retain the
+original request and approval envelopes: their payload, key identifier and signature. This includes
+the signed `instruction` text. The attempt report uses format `evidect-credential-lifecycle-attempt/2`
+and `signed_inputs: {request, approval}` when retained, or `signed_inputs: null` otherwise.
+Retention is not a general content-redaction mechanism. It does not
+serialize the full invocation input, which includes the credential token, or export private keys.
+
+Offline verification takes evidence, trust configuration and expected scope as separate inputs.
+It recomputes signatures, digests and bindings using the existing experimental encodings, rather
+than trusting stored verification labels. It does not adopt a key merely because that key appears
+in the evidence. The fixture generates all three inputs under one controller; separate files do
+not establish independent trust, an external witness, or an authenticated historical scope.
+
+| Input | Format and selected fields |
+| --- | --- |
+| Evidence | `evidect-credential-offline-evidence/1`: `context_id`, `attempts`, `provider_observation` |
+| Trust | `evidect-credential-lifecycle-trust/1`: `contextId`, issuer/approver key entries, collector and expected provider identity |
+| Expectation | `evidect-credential-offline-expectation/1`: `contextId` and a unique `requestDigests` inventory adopted by the receiver |
+
+Trust's issuer/approver entries contain `keyId`, `subject` and `publicKeySpki` (DER encoded as base64).
+Collector trust contains `collectorId`, `keyId`, `publicKeySpki` and `generation`; provider trust identifies
+`providerId` and `providerInstanceId`. The evidence must match the supplied context and expected
+request inventory. An inventory comparison establishes coverage of that chosen inventory, not that
+the inventory captures every real event. A producer-generated trust/expectation pair is a fixture
+input; receiving those files does not substitute for the receiver's decision to adopt them.
+
+Missing keys, envelopes or observations remain distinct from established signature or binding
+contradictions. Neither missing data nor a prior stored `VALID` result can supply a successful check.
+The aggregate report and provider observations remain unsigned even if retained signatures verify.
+`reported_execution` is an unsigned assertion. Clear contradictions between that assertion and other
+supplied fields produce `INVALID`; internal consistency does not prove that the reported action occurred.
+
+The offline result's `evidence_consistency` is `VALID`, `INVALID` or `INDETERMINATE`, limited to the
+supplied material and separate trust/scope inputs. `overall_status` is never `VALID`: it remains
+`INDETERMINATE`, or is `INVALID` when contradictions are established. The CLI returns 0 for limited
+`VALID` consistency, 1 for `INVALID`, and 2 for unresolved material or file-input errors.
+Each input file is limited to 2 MiB. The reader rejects duplicate keys, excessive nesting and invalid
+UTF-8. Numeric input must use JSON integer lexemes within the safe-integer range; decimal and exponent
+forms are rejected before conversion, rather than rounded into an accepted integer.
+
+This is read-only verification. It does not invoke the provider, mint credentials, release replay
+reservations or authorize another attempt. Checking a recorded collector response establishes its
+signature and binding to the recorded exchange, not current freshness or current collector health.
+It does not independently establish historical authorization state, trusted UTC time, or actual effects.
+`historical_authorization` remains `NOT_ASSESSED`; current collector freshness, provider authenticity,
+log completeness and aggregate-pack authenticity remain `NOT_ESTABLISHED`.
 
 ## Assurance and exclusions
 

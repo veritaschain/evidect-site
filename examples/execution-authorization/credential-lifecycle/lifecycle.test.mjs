@@ -660,7 +660,7 @@ test('CLI emits a complete bounded synthetic report and rejects extra input argu
   assert.equal(run.stderr, '');
   assert.ok(run.stdout.length > 0 && run.stdout.length < 1024 * 1024);
   const report = JSON.parse(run.stdout);
-  assert.equal(report.format, 'evidect-credential-lifecycle-report/1');
+  assert.equal(report.format, 'evidect-credential-lifecycle-report/2');
   assert.equal(report.test_result, 'PASS');
   assert.equal(report.case_count, 18);
   assert.equal(report.cases.length, 18);

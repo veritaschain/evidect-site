@@ -93,9 +93,9 @@ export function runDemo() {
   }
   {
     const { f, parent, credential } = provisioned({ wrapProvider(provider, context) {
-      return { ...provider, invoke(operation, secret, session) {
+      return { ...provider, invoke(operation, secret, session, dispatch) {
         context.providerOwned.control.setRevoked(operation.credentialRef);
-        return provider.invoke(operation, secret, session);
+        return provider.invoke(operation, secret, session, dispatch);
       } };
     } });
     const step = f.execute(f.input(use(parent), { credential }));
@@ -190,8 +190,8 @@ export function runDemo() {
   }
   {
     const { f, parent, credential } = provisioned({ wrapProvider(provider) {
-      return { ...provider, invoke(operation, secret, session) {
-        provider.invoke(operation, secret, session); throw new Error('SYNTHETIC_RESPONSE_LOSS');
+      return { ...provider, invoke(operation, secret, session, dispatch) {
+        provider.invoke(operation, secret, session, dispatch); throw new Error('SYNTHETIC_RESPONSE_LOSS');
       } };
     } }), value = f.input(use(parent), { credential });
     const first = f.execute(value), replay = f.execute(value);
@@ -241,7 +241,7 @@ export function runDemo() {
   const matched = cases.length === CASE_IDS.length && cases.every((value, index) =>
     value.case_id === CASE_IDS[index] && value.test_result === 'PASS');
   return {
-    format: 'evidect-credential-lifecycle-report/1', test_result: matched ? 'PASS' : 'FAIL', case_count: cases.length, cases,
+    format: 'evidect-credential-lifecycle-report/2', test_result: matched ? 'PASS' : 'FAIL', case_count: cases.length, cases,
     overall_status: 'INDETERMINATE', report_signed: false, production_observed: false, independent_assessment: false,
     witness_integrated: false, external_anchor_verified: false, runtime_attestation: false,
     control_status: 'NOT_ASSESSED', legal_compliance: 'NOT_ASSESSED',
@@ -251,7 +251,8 @@ export function runDemo() {
       counter_oracle: 'HARNESS_OWNED_NOT_INDEPENDENT_EVIDENCE',
       clock: 'SHARED_LOGICAL_SECONDS_NOT_TRUSTED_UTC', collector_health: 'POINT_IN_TIME_CHALLENGE_ONLY',
       replay: 'PROCESS_LOCAL_RESERVATIONS_NO_RESTART_GUARANTEE',
-      offline_request_reverification: 'NOT_IMPLEMENTED', receiver_witness: 'REFERENCED_NOT_INTEGRATED',
+      offline_request_reverification: 'SEPARATE_VERIFIER_REQUIRES_ADOPTED_TRUST_AND_SCOPE',
+      provider_correlation: 'SCOPED_UNSIGNED_RECORD_CONSISTENCY', receiver_witness: 'REFERENCED_NOT_INTEGRATED',
       internal_agent_intent: 'NOT_OBSERVED', live_provider: 'NOT_CONNECTED' },
     notice: 'PASS means the fixed synthetic expectations matched, including surviving sessions, direct bypass effects '
       + 'and missing observations. Actual Ed25519 signatures do not establish independent administration, '

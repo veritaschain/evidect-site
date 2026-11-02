@@ -18,12 +18,15 @@ Node.js 22系、追加npmパッケージ・APIキー不要です。
 ```sh
 git rev-parse HEAD
 node --version
-node --test --test-reporter=tap examples/execution-authorization/credential-lifecycle/lifecycle.test.mjs
+node --test --test-reporter=tap \
+  examples/execution-authorization/credential-lifecycle/lifecycle.test.mjs \
+  examples/execution-authorization/credential-lifecycle/correlation.test.mjs \
+  examples/execution-authorization/credential-lifecycle/offline.test.mjs
 node examples/execution-authorization/credential-lifecycle/demo.mjs
 ```
 
-demoは固定された合成ケースを実行し、JSONを標準出力へ返します。CLIにURL、資格情報、
-ファイルパス、任意コードを与える機構はありません。期待値の不一致・実行エラーは非0で終了します。
+`demo.mjs`は固定された合成ケースを実行し、JSONを標準出力へ返します。このコマンドは引数を受け付けません。
+期待値の不一致・実行エラーは非0で終了します。保存資料を扱うオフライン用コマンドとは別です。
 `test_result: PASS`は、拒否や未検出の負の対照を含む期待結果との一致です。
 攻撃を全て防いだ、本番で安全だった、法令へ適合したという意味ではありません。
 
@@ -39,8 +42,8 @@ collector、broker、providerは別のローカル状態を持ちますが、**�
 別の変数・鍵・オブジェクトを用意したことは、管理主体の独立性を意味しません。
 collectorが署名するのは要求に対応する受領・照合応答です。providerの結果や全ライフサイクルの
 真実性を署名で証明するものではなく、providerの観測記録と集計report自体は未署名です。
-reportは元の要求・承認の本文と署名を保存する形式ではありません。保存JSONだけを使った、
-元の要求・承認のオフライン再検証は未実装です。
+元の要求・承認の署名付きenvelopeは、`retainSignedInputs`を明示的に有効にした場合に保持します。
+保存した署名付き資料の再検証と、未署名のprovider記録の相関は別の結果として扱います。
 
 ## 結果の読み方
 
@@ -52,8 +55,9 @@ reportは元の要求・承認の本文と署名を保存する形式ではあ�
 | collectorの署名とfresh nonceが一致 | 照合対象の要求・操作への応答が成立した | 継続的な健全性、後の実行時点まで監視が生きていたこと |
 | 観測ログが不足 | 照合に必要な範囲が未確定 | 操作がなかったこと、課金・流出がなかったこと |
 
-秘密の値をレポートへ保存しません。参照IDは秘密の値そのものや、秘密値の単純hashではありません。
-試験用秘密鍵も実行ごとに生成し、出力しません。メモリ破棄は安全消去の証明ではありません。
+この合成fixtureは資格情報の生値をレポートへ保存しません。参照IDは秘密の値そのものや、
+秘密値の単純hashではありません。試験用秘密鍵も実行ごとに生成し、出力しません。
+署名付き入力を保持するときは`instruction`本文も含まれます。メモリ破棄は安全消去の証明ではありません。
 
 操作前の資格情報状態は`credential_precheck`、providerの作用後の状態は
 `provider_result.credential_status`です。例えば発行前は`NOT_ISSUED`でも、発行後は`ACTIVE`等へ変わり、
@@ -85,6 +89,77 @@ providerログの対象範囲が不足する場合、ログにないことから
 ログの取得が再開しても、その間に記録されなかった過去の効果は復元されません。
 `AVAILABLE`は現在の取得可否を示すだけで、履歴全体の完全性を示しません。
 
+## 要求と観測記録の対応付け
+
+相関は、提供された記録と、別に指定した期待範囲の中で行います。次の識別子を混同しません。
+
+| 識別する対象 | 意味と限界 |
+|---|---|
+| `contextId` | 鍵と要求を照合する範囲。fixtureはこれを要求の`taskId`と`nonce`に含め、署名対象へ束縛する |
+| 要求のdigest | 元の署名対象に結び付いた要求の識別。再送された要求と新しい要求を区別するために使う |
+| `dispatch_id` | wrapperがdispatch直前に発行する識別子。IDがあることだけではproviderの効果を示さない |
+| `providerRequestId` | 模擬provider自身が呼出し時に発行するID。`providerId`・`providerInstanceId`の名前空間とともに照合する |
+
+対応が見つからない記録、重複・競合、観測不足を、正常な対応に補完しません。
+同じ要求の再送は拒否し、新たなdispatchやprovider呼出しのIDを作りません。
+返答喪失後にauditだけで一意に対応した場合は`OBSERVATION_ONLY`であり、元の実行結果
+`FAILED_EFFECT_POSSIBLE`を成功へ変更しません。相関の成立は、渡された記録同士が
+対応するという意味であり、記録の真実性・履歴全体の完全性・実行主体の本人性を確立しません。
+
+## 署名付き入力の保持とオフライン再検証
+
+`retainSignedInputs`は既定では無効です。合成fixtureは明示的に有効にし、`signed_inputs`に要求・承認の
+payload、key ID、signatureを保持します。無効の場合は`signed_inputs: null`で、元の要求・承認を
+再検証する材料は不足したままです。署名対象の`instruction`本文も含むため、一般入力を自動で秘匿化する
+機能ではありません。入力全体を保存する方式ではなく、`credential`の生値と秘密鍵は保持対象に含めません。
+
+オフライン再検証では、次の3つを別入力として扱います。
+
+| 入力 | 役割 |
+|---|---|
+| `evidence.json` | 元の署名付きenvelopeと、照合対象の記録。保存済みの`VALID`表示を根拠にしない |
+| `trust.json` | 検証側が選ぶ公開鍵、context、期待するproviderの識別。evidence内の鍵を自動で信頼しない |
+| `expectation.json` | 検証側が期待する`contextId`と一意な`requestDigests`の集合。集合に対する不足・余分を検査する |
+
+生成用fixtureは3入力を同じcontrollerで用意します。これは再現用の組であり、受取側が公開鍵と
+期待範囲を別に確認して採用する運用を代替しません。別ファイルに分けても、独立した鍵認証や
+対象範囲の保証にはなりません。オフライン検証は署名と対応関係を再計算する読み取り専用の処理です。
+providerを呼び出さず、資格情報を発行せず、失われた応答の操作を再実行しません。
+
+`offline-demo.mjs`は旧demoの18ケースとは別に、発行→読取り→使用→使用→失効という5要求と
+5件のprovider記録を生成します。同じ使用操作でも、別の署名要求は別に対応付けます。
+
+```sh
+node examples/execution-authorization/credential-lifecycle/offline-demo.mjs credential-offline-output
+node examples/execution-authorization/credential-lifecycle/verify-offline.mjs \
+  credential-offline-output/evidence.json \
+  credential-offline-output/trust.json \
+  credential-offline-output/expectation.json
+```
+
+生成先は新規ディレクトリに限り、既存ディレクトリを上書きしません。再検証コマンドは3つのローカルJSONを
+別プロセスで読み込みます。各入力ファイルは2 MiBを上限とし、重複キー、過深なJSON、不正UTF-8を拒否します。
+数値は安全整数の範囲にあるJSON整数字句だけを受理し、小数点・指数表現は数値変換前に拒否します。
+URL、実資格情報、実行するコードを入力するコマンドではありません。
+
+| 終了コード | 限定された判定 |
+|---|---|
+| `0` | `evidence_consistency: VALID`。提供資料内の検査が成立しても、`overall_status`は`INDETERMINATE` |
+| `1` | 署名や対応関係などに矛盾があり、`INVALID` |
+| `2` | 材料不足等による`INDETERMINATE`、またはファイルの読み取り・解析エラー |
+
+相関単独の`CONSISTENT`も、提供された記録内での対応を示す限定結果です。
+`VALID`や終了コード`0`を、本番認可・実際の効果・pack全体の真正性の合格として読み替えません。
+未署名の`reported_execution`も実行の証明ではありません。他の保存フィールドと明白に矛盾する場合は
+`INVALID`にしますが、矛盾がないことから実際にその操作が起きたとは認定しません。
+
+保存したcollector応答を検証しても、現在のcollectorの稼働や現在のnonceの鮮度を示すものではありません。
+保存時の認可状態、信頼できるUTC時刻、実際の効果も独立には再確認しません。
+署名の不一致・記録間の矛盾と、鍵・envelope・観測の不足を分け、不足を合格として扱いません。
+`historical_authorization`は`NOT_ASSESSED`のままで、現在のcollectorの鮮度、providerの真正性、
+ログ全体の完全性、pack全体の真正性は`NOT_ESTABLISHED`です。生成時の`manifest.json`と
+`demo-summary.json`も未署名であり、この限定を変更しません。
+
 ## 固定18ケース
 
 | case_id | 期待する結果 |
@@ -109,12 +184,13 @@ providerログの対象範囲が不足する場合、ログにないことから
 | `consumed-request-replay` | 同じ要求を再送しても二回目の効果を作らない |
 
 demoの`harness_provider_oracle`は、試験を採点するcontrollerの私有状態です。
-`provider_audit`は通常の照合で取得できた記録です。両者を混ぜず、一般的なイベント単位の突合や
-ログ全体の完全性は`NOT_ESTABLISHED`のままにします。
+`provider_audit`は通常の照合で取得できた記録です。相関処理は、oracleを使ってauditの欠落を補完しません。
+対象範囲内で記録が対応しても、ログ全体の完全性は`NOT_ESTABLISHED`のままにします。
 
-独立に構成した31件のテストは、上記ケースに加え、異なる署名対象への差替え、不正な型、
+`lifecycle.test.mjs`の31件のテストは、上記ケースに加え、異なる署名対象への差替え、不正な型、
 時計の不一致、要求発行前の受領時刻、ログ再開後も過去の欠測が残ること、無引数CLIを検査します。
-31件と18ケースは重なる検証を含むため、単純に合算して独立試験数とはしません。
+相関とオフライン再検証は`correlation.test.mjs`と`offline.test.mjs`で別に検査します。
+テストとdemoケースは重なる検証を含むため、単純に合算して独立試験数とはしません。
 
 ## witnessとの関係
 
@@ -128,8 +204,10 @@ demoの`harness_provider_oracle`は、試験を採点するcontrollerの私有�
 ## CIと残る範囲
 
 [credential-lifecycle CI](../../../.github/workflows/credential-lifecycle.yml)はUbuntu 24.04とmacOS 15、
-Node.js 22で新しい境界テストと既存gateのテストを実行し、demoのJSONを生成します。
-テストログ、report、実際にcheckoutしたcommitとソースhashのinventoryを14日間保存します。
+Node.js 22でlifecycle・相関・オフライン再検証と既存gateのテストを実行します。旧demoの18ケースに加え、
+5要求のオフライン用資料を生成し、別プロセスのCLIで再検証します。
+テストログ、report、生成したevidence・trust・expectation、再検証結果、実際にcheckoutしたcommitと
+ソース・生成ファイルのhashを含むinventoryを14日間保存します。
 workflowの追加とCI実行成功は別です。対象PRのheadに対応したrunで結果を確認してください。
 
 reportとCI inventoryは未署名です。`production_observed`と`independent_assessment`は`false`、
@@ -146,3 +224,7 @@ derived-session survival, direct provider use, missing observations, and partial
 distinct outcomes. All components and keys are controlled by one local harness. No live provider,
 production identity, independent collector, witness integration, or legal compliance is established.
 Passing tests mean the expected bounded outcomes occurred, including negative controls.
+Opt-in retention includes the original signed request and approval payloads, including instruction text,
+but excludes credential token values and private keys. Offline verification uses separately supplied
+trust and expected scope; it does not establish current authority, fresh monitoring or the truth and
+completeness of unsigned provider observations.

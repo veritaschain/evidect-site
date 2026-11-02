@@ -2,6 +2,8 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createGate } from '../gate.mjs';
 import { routeResource } from '../service-routing/routing.mjs';
+import { providerIdentitySnapshot, dispatchContextSnapshot, providerInvocationSnapshot,
+  providerObservationSnapshot, correlateProviderObservations } from './correlation.mjs';
 import {
   need, integer, identifier, digestString, record, snapshot, operationSnapshot,
   operationDigest, operationResource, intentSnapshot, intentDigest, querySnapshot,
@@ -21,9 +23,11 @@ const statusOf = (entry, at) => entry.revoked ? 'REVOKED' : at < entry.notBefore
 const decision = (status, reason, credential_status) => ({ status, reason, credential_status });
 
 /** The provider owns its credential registry and counters. Control methods are held only by the test controller. */
-export function createMockProvider({ managerSubjects, now }) {
+export function createMockProvider({ managerSubjects, now, providerId = 'fixture-a',
+  providerInstanceId = 'provider-' + randomBytes(16).toString('hex') }) {
   need(Array.isArray(managerSubjects) && managerSubjects.length > 0 && managerSubjects.every(identifier));
   need(new Set(managerSubjects).size === managerSubjects.length && typeof now === 'function');
+  const identity = Object.freeze(providerIdentitySnapshot({ providerId, providerInstanceId }));
   const managers = new Set(managerSubjects), credentials = new Map(), delivered = new Map();
   const effects = [], publicLog = [];
   let attempts = 0, logging = true;
@@ -42,6 +46,7 @@ export function createMockProvider({ managerSubjects, now }) {
       need(identifier(session.subject) && identifier(session.agent));
     } catch { return decision('INDETERMINATE', 'PROVIDER_INPUT_OR_STATE_INVALID', 'UNKNOWN'); }
     if (session.subject !== op.principal) return decision('DENY', 'PROVIDER_PRINCIPAL_MISMATCH', 'UNKNOWN');
+    if (op.route.provider !== identity.providerId) return decision('DENY', 'PROVIDER_ROUTE_MISMATCH', 'UNKNOWN');
     if (['mint', 'read', 'revoke'].includes(op.kind) && !managers.has(session.subject))
       return decision('DENY', 'PROVIDER_MANAGEMENT_PERMISSION_MISSING', 'UNKNOWN');
     if (['mint', 'derive'].includes(op.kind)) {
@@ -71,14 +76,22 @@ export function createMockProvider({ managerSubjects, now }) {
     if (op.kind !== 'use' && credential !== null) return decision('DENY', 'UNEXPECTED_CREDENTIAL', live);
     return decision('ALLOW', 'PROVIDER_OPERATION_ALLOWED', live);
   }
-  function invoke(raw, credential, session) {
+  function invoke(raw, credential, session, context = null) {
     attempts++;
+    const providerRequestId = 'provider-request-' + randomBytes(16).toString('hex');
+    let binding = null;
+    try { if (context !== null) binding = dispatchContextSnapshot(context); }
+    catch { return { ...decision('DENIED', 'PROVIDER_CONTEXT_INVALID', 'UNKNOWN'), ...identity,
+      providerRequestId, dispatchId: null, requestDigest: null, operationDigest: null }; }
+    const response = (status, reason, credentialStatus, op) => ({ ...decision(status, reason, credentialStatus),
+      ...identity, providerRequestId, dispatchId: binding?.dispatchId ?? null,
+      requestDigest: binding?.requestDigest ?? null, operationDigest: op ? operationDigest(op) : null });
     // Invocation has its own single time read, after preflight. A broken clock
     // must never turn a previously allowed preflight into a provider effect.
     const at = (() => { try { return currentTime(now); } catch { return null; } })();
     const checked = check(raw, credential, session, at);
     let op;
-    try { op = operationSnapshot(raw); } catch { return decision('DENIED', checked.reason, checked.credential_status); }
+    try { op = operationSnapshot(raw); } catch { return response('DENIED', checked.reason, checked.credential_status, null); }
     let effect = false;
     if (checked.status === 'ALLOW') {
       if (op.kind === 'mint' || op.kind === 'derive') {
@@ -93,16 +106,23 @@ export function createMockProvider({ managerSubjects, now }) {
         if (!entry.revoked) { entry.revoked = true; counts.revokeCount++; effect = true; }
       }
     }
-    const outcome = { attempt: attempts, kind: op.kind, credentialRef: op.credentialRef,
-      parentRef: op.parentRef, principal: op.principal, tenant: op.tenant, resource: routeResource(op.route),
+    // Correlation metadata is not provider authorization. The operation digest
+    // is computed from what this provider actually received, not copied from context.
+    const outcome = { ...identity, providerRequestId, dispatchId: binding?.dispatchId ?? null,
+      requestDigest: binding?.requestDigest ?? null, operationDigest: operationDigest(op),
+      attempt: attempts, kind: op.kind, credentialRef: op.credentialRef,
+      parentRef: op.parentRef, principal: op.principal, tenant: op.tenant, route: op.route, resource: routeResource(op.route),
+      notBefore: op.notBefore, expiresAt: op.expiresAt,
       at, status: checked.status === 'ALLOW' ? 'COMPLETED' : 'DENIED', reason: checked.reason, effect };
     if (effect) effects.push(snapshot(outcome));
     if (logging) publicLog.push(snapshot(outcome));
-    return decision(outcome.status, outcome.reason, outcome.status === 'COMPLETED'
-      ? statusOf(credentials.get(op.credentialRef), at) : checked.credential_status);
+    return response(outcome.status, outcome.reason, outcome.status === 'COMPLETED'
+      ? statusOf(credentials.get(op.credentialRef), at) : checked.credential_status, op);
   }
   return Object.freeze({
+    identity,
     provider: Object.freeze({
+      identity,
       preflight(raw, credential, session) { return check(raw, credential, session); }, invoke,
       observe() { return logging ? { status: 'AVAILABLE', records: snapshot(publicLog) }
         : { status: 'UNAVAILABLE', records: null }; },
@@ -163,44 +183,28 @@ export function createCollector({ collectorId, keyId, privateKey, now, generatio
 }
 
 function providerDecision(value, invocation = false) {
+  if (invocation) return providerInvocationSnapshot(value);
   record(value, ['status', 'reason', 'credential_status']);
   need((invocation ? ['COMPLETED', 'DENIED'] : ['ALLOW', 'DENY', 'INDETERMINATE']).includes(value.status));
   need(identifier(value.reason) && ['ACTIVE', 'REVOKED', 'EXPIRED', 'NOT_YET_VALID', 'UNKNOWN', 'NOT_ISSUED', 'MISMATCH']
     .includes(value.credential_status));
   return { ...value };
 }
-function providerObservation(value) {
-  record(value, ['status', 'records']);
-  need(['AVAILABLE', 'UNAVAILABLE'].includes(value.status));
-  if (value.status === 'UNAVAILABLE') { need(value.records === null); return value; }
-  need(Array.isArray(value.records));
-  let previousAttempt = 0;
-  for (const row of value.records) {
-    record(row, ['attempt', 'kind', 'credentialRef', 'parentRef', 'principal', 'tenant',
-      'resource', 'at', 'status', 'reason', 'effect']);
-    need(integer(row.attempt) && row.attempt > previousAttempt && integer(row.at));
-    need(['mint', 'derive', 'read', 'use', 'revoke'].includes(row.kind));
-    need(['credentialRef', 'principal', 'tenant', 'reason'].every(k => identifier(row[k])));
-    need(row.parentRef === null || (identifier(row.parentRef) && row.parentRef !== row.credentialRef));
-    need(typeof row.resource === 'string' && row.resource.startsWith('route:') && digestString(row.resource.slice(6)));
-    need(['COMPLETED', 'DENIED'].includes(row.status) && typeof row.effect === 'boolean');
-    need(row.status !== 'DENIED' || row.effect === false);
-    previousAttempt = row.attempt;
-  }
-  return value;
-}
 const unavailable = reason => ({ status: 'INDETERMINATE', reason });
 const unchecked = () => ({ status: 'NOT_CHECKED', reason: 'NOT_CHECKED' });
 
 export function createCredentialLifecycle({ issuerKeys, approverKeys, delegationState, provider,
-  collector, collectorTrust, now, maxCollectorAge = 5 }) {
+  collector, collectorTrust, now, maxCollectorAge = 5, providerIdentity = null, retainSignedInputs = false }) {
   need(typeof now === 'function' && integer(maxCollectorAge) && maxCollectorAge > 0 && maxCollectorAge <= 60);
+  need(typeof retainSignedInputs === 'boolean');
   record(collectorTrust, ['collectorId', 'keyId', 'publicKey', 'generation']);
   need(identifier(collectorTrust.collectorId) && identifier(collectorTrust.keyId) &&
     integer(collectorTrust.generation) && collectorTrust.generation > 0 &&
     collectorTrust.publicKey?.type === 'public' && collectorTrust.publicKey.asymmetricKeyType === 'ed25519');
   const trust = { ...collectorTrust };
   const providerAdapter = bindMethods(provider, ['preflight', 'invoke', 'observe']);
+  const identityDescriptor = Object.getOwnPropertyDescriptor(provider, 'identity');
+  const identity = providerIdentitySnapshot(providerIdentity === null ? identityDescriptor?.value : providerIdentity);
   const collectorAdapter = bindMethods(collector, ['collect', 'status']);
   const gateState = Object.create(null), claims = new Map(), claimedNonces = new Set();
   const gate = createGate({ issuerKeys, approverKeys, state: gateState });
@@ -229,19 +233,34 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
     if (p.recordedAt > at) return unavailable('COLLECTOR_RECEIPT_TIME_UNRESOLVED');
     return { status: 'VALID', reason: 'COLLECTOR_RECEIPT_BOUND', envelope: result.envelope };
   }
-  function freshStatus(intent, expectedReceipt = null) {
+  function emptyCollectorEvidence(intent = null) {
+    return { intent: intent === null ? null : snapshot(intent),
+      collection: { attempted: false, received: false, response: null, receivedAt: null },
+      status: { attempted: false, received: false, query: null, response: null, receivedAt: null },
+      maxAge: maxCollectorAge };
+  }
+  function captureResponse(target, raw) {
+    target.received = true;
+    try { target.response = snapshot(raw); }
+    catch { target.response = null; }
+    return target.response;
+  }
+  function freshStatus(intent, expectedReceipt = null, evidence = emptyCollectorEvidence(intent)) {
     const query = { collectorId: trust.collectorId, requestDigest: intent.requestDigest,
       operationDigest: intent.operationDigest, intentDigest: intentDigest(intent), nonce: randomBytes(32).toString('hex') };
+    evidence.status.attempted = true; evidence.status.query = snapshot(query);
     let received;
-    try { received = collectorAdapter.status(snapshot(query)); }
+    try { received = captureResponse(evidence.status, collectorAdapter.status(snapshot(query))); }
     catch { return unavailable('COLLECTOR_STATUS_UNAVAILABLE'); }
+    if (received === null) return { status: 'INVALID', reason: 'MALFORMED_ENVELOPE' };
     const result = openStatus(received, trust);
     if (result.status !== 'VALID') return result;
     const p = result.payload;
     if (['collectorId', 'requestDigest', 'operationDigest', 'intentDigest', 'nonce'].some(k => p[k] !== query[k]) ||
       p.generation !== trust.generation) return { status: 'INVALID', reason: 'COLLECTOR_STATUS_BINDING_MISMATCH' };
     let at;
-    try { at = currentTime(now); } catch { return unavailable('LOCAL_CLOCK_UNAVAILABLE'); }
+    try { at = currentTime(now); evidence.status.receivedAt = at; }
+    catch { return unavailable('LOCAL_CLOCK_UNAVAILABLE'); }
     if (p.checkedAt > at || at - p.checkedAt >= maxCollectorAge) return unavailable('COLLECTOR_STATUS_STALE');
     if (p.status !== 'FOUND') return unavailable('COLLECTION_NOT_FOUND_AT_QUERY');
     const receipt = receiptCheck(p.receipt, intent, p.checkedAt);
@@ -253,12 +272,19 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
       verified_at: at, envelope: result.envelope, receipt: receipt.envelope };
   }
   function observation() {
+    let received = false, raw = null;
     try {
-      return providerObservation(snapshot(providerAdapter.observe()));
-    } catch { return { status: 'UNAVAILABLE', records: null }; }
+      const value = providerAdapter.observe(); received = true; raw = snapshot(value);
+      return { raw, publicValue: providerObservationSnapshot(raw) };
+    } catch {
+      const publicValue = { status: 'UNAVAILABLE', records: null };
+      // The compatibility view remains unavailable. The correlation check must
+      // still distinguish a received contradiction from an observation outage.
+      return { raw: received ? raw : publicValue, publicValue };
+    }
   }
   function baseReport() {
-    return { format: 'evidect-credential-lifecycle-attempt/1', request_digest: null, operation_digest: null,
+    return { format: 'evidect-credential-lifecycle-attempt/2', request_digest: null, operation_digest: null,
       operation: null, authorization: 'DENY', reason: 'INVALID_INPUT',
       request_signature: 'NOT_CHECKED', approval_signature: 'NOT_CHECKED', gate_execution: null,
       collector_receipt: unchecked(), collector_freshness: unchecked(), credential_precheck: unchecked(),
@@ -268,7 +294,10 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
       monitoring_at_dispatch: 'NOT_ESTABLISHED', overall_status: 'INDETERMINATE',
       report_signed: false, production_observed: false, independent_assessment: false,
       external_anchor_verified: false, witness_integrated: false,
-      control_status: 'NOT_ASSESSED', legal_compliance: 'NOT_ASSESSED' };
+      control_status: 'NOT_ASSESSED', legal_compliance: 'NOT_ASSESSED',
+      provider_identity: { ...identity }, dispatch_id: null, signed_inputs: null,
+      collector_evidence: emptyCollectorEvidence(), provider_response: { received: false, value: null },
+      provider_correlation: null };
   }
   function executeOwned(input) {
     const report = baseReport();
@@ -278,6 +307,7 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
       owned = snapshot(input); op = operationSnapshot(owned.operation);
       need(owned.credential === null || (typeof owned.credential === 'string' && owned.credential.length === 64 && /^[0-9a-f]{64}$/.test(owned.credential)));
     } catch { return report; }
+    if (retainSignedInputs) report.signed_inputs = snapshot({ request: owned.request, approval: owned.approval });
     report.operation = op; report.operation_digest = operationDigest(op);
     refresh();
     const preview = gate.preview(owned.request, owned.approval, owned.session);
@@ -296,22 +326,26 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
       operationDigest: report.operation_digest, resource: request.resource, principal: op.principal,
       tenant: op.tenant, policyRevision: request.policyRevision, requestGeneration: request.generation,
       requestIssuedAt: request.issuedAt, requestExpiresAt: request.expiresAt };
+    report.collector_evidence.intent = snapshot(intent);
     // A conservative process-local claim occurs before collection. Lost acknowledgements never release it.
-    claimedNonces.add(replayKey); claims.set(report.request_digest, { intent: snapshot(intent), receipt: null, invalidReason: null });
+    claimedNonces.add(replayKey); claims.set(report.request_digest,
+      { intent: snapshot(intent), receipt: null, invalidReason: null, evidence: report.collector_evidence });
     report.replay_claim = 'CLAIMED';
+    report.collector_evidence.collection.attempted = true;
     let receipt;
-    try { receipt = collectorAdapter.collect(snapshot(intent)); }
+    try { receipt = captureResponse(report.collector_evidence.collection, collectorAdapter.collect(snapshot(intent))); }
     catch { report.collector_receipt = unavailable('COLLECTOR_ACKNOWLEDGEMENT_UNAVAILABLE'); report.reason = report.collector_receipt.reason; return report; }
     let at;
-    try { at = currentTime(now); } catch { report.collector_receipt = unavailable('LOCAL_CLOCK_UNAVAILABLE'); report.reason = 'LOCAL_CLOCK_UNAVAILABLE'; return report; }
-    report.collector_receipt = receiptCheck(receipt, intent, at);
+    try { at = currentTime(now); report.collector_evidence.collection.receivedAt = at; }
+    catch { report.collector_receipt = unavailable('LOCAL_CLOCK_UNAVAILABLE'); report.reason = 'LOCAL_CLOCK_UNAVAILABLE'; return report; }
+    report.collector_receipt = receipt === null ? { status: 'INVALID', reason: 'MALFORMED_ENVELOPE' } : receiptCheck(receipt, intent, at);
     const claim = claims.get(report.request_digest);
     if (report.collector_receipt.status !== 'VALID') {
       if (report.collector_receipt.status === 'INVALID') claim.invalidReason = report.collector_receipt.reason;
       report.reason = report.collector_receipt.reason; return report;
     }
     claim.receipt = report.collector_receipt.envelope;
-    report.collector_freshness = freshStatus(intent, claim.receipt);
+    report.collector_freshness = freshStatus(intent, claim.receipt, report.collector_evidence);
     if (report.collector_freshness.status !== 'VALID') {
       if (report.collector_freshness.status === 'INVALID') claim.invalidReason = report.collector_freshness.reason;
       report.reason = report.collector_freshness.reason; return report;
@@ -324,15 +358,31 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
     report.authorization = report.gate_execution.authorization; report.reason = report.gate_execution.reason;
     if (report.gate_execution.execution !== 'COMPLETED') return report;
     report.monitoring_at_dispatch = 'POINT_IN_TIME_ONLY';
+    report.dispatch_id = 'dispatch-' + randomBytes(16).toString('hex');
     report.provider_attempted = true;
     try {
-      report.provider_result = providerDecision(providerAdapter.invoke(op, owned.credential, owned.session), true);
-      report.execution = report.provider_result.status === 'COMPLETED' ? 'COMPLETED' : 'DENIED_BY_PROVIDER';
+      const rawResponse = providerAdapter.invoke(op, owned.credential, owned.session,
+        { dispatchId: report.dispatch_id, requestDigest: report.request_digest, operationDigest: report.operation_digest });
+      report.provider_response.received = true;
+      report.provider_response.value = snapshot(rawResponse);
+      report.provider_result = providerDecision(report.provider_response.value, true);
+      const response = report.provider_result;
+      if (response.providerId !== identity.providerId || response.providerInstanceId !== identity.providerInstanceId ||
+          response.dispatchId !== report.dispatch_id || response.requestDigest !== report.request_digest ||
+          response.operationDigest !== report.operation_digest) {
+        report.execution = 'FAILED_EFFECT_POSSIBLE'; report.reason = 'PROVIDER_RESPONSE_BINDING_MISMATCH';
+      } else report.execution = response.status === 'COMPLETED' ? 'COMPLETED' : 'DENIED_BY_PROVIDER';
     } catch {
       report.provider_result = decision('INDETERMINATE', 'PROVIDER_OUTCOME_UNRESOLVED', 'UNKNOWN');
       report.execution = 'FAILED_EFFECT_POSSIBLE';
     }
-    report.provider_observation = observation();
+    const observed = observation();
+    report.provider_observation = observed.publicValue;
+    report.provider_correlation = correlateProviderObservations({ expectedProvider: identity,
+      attempts: [...history, report].filter(item => item.operation !== null).map(item => ({
+        requestDigest: item.request_digest, operation: item.operation, dispatchId: item.dispatch_id,
+        providerAttempted: item.provider_attempted, response: item.provider_response })),
+      observation: observed.raw });
     return report;
   }
   return Object.freeze({
@@ -344,28 +394,31 @@ export function createCredentialLifecycle({ issuerKeys, approverKeys, delegation
     },
     reconcile(requestDigest) {
       const validDigest = digestString(requestDigest);
-      const result = { format: 'evidect-credential-lifecycle-reconciliation/1', request_digest: validDigest ? requestDigest : null,
+      const result = { format: 'evidect-credential-lifecycle-reconciliation/2', request_digest: validDigest ? requestDigest : null,
         status: 'INDETERMINATE', reason: 'CLAIM_UNKNOWN', collector_freshness: unchecked(),
-        dispatch_permitted: false, provider_attempted: false, overall_status: 'INDETERMINATE' };
+        dispatch_permitted: false, provider_attempted: false, overall_status: 'INDETERMINATE',
+        collector_evidence: emptyCollectorEvidence() };
       if (active) return { ...result, reason: 'REENTRANT_RECONCILIATION_REJECTED' };
       if (!validDigest) return { ...result, reason: 'INVALID_INPUT' };
       if (!claims.has(requestDigest)) return result;
       const claim = claims.get(requestDigest);
+      result.collector_evidence = snapshot(claim.evidence);
       // Later unavailability cannot erase contradictory evidence already seen.
       if (claim.invalidReason !== null) return { ...result, status: 'INVALID', reason: claim.invalidReason };
       active = true;
       try {
-        result.collector_freshness = freshStatus(claim.intent, claim.receipt);
+        result.collector_evidence.status = emptyCollectorEvidence().status;
+        result.collector_freshness = freshStatus(claim.intent, claim.receipt, result.collector_evidence);
         result.status = result.collector_freshness.status;
         result.reason = result.status === 'VALID' ? 'METADATA_RECOVERED_NO_DISPATCH' : result.collector_freshness.reason;
-        if (result.status === 'INVALID') claim.invalidReason = result.reason;
+        if (result.status === 'INVALID') { claim.invalidReason = result.reason; claim.evidence = snapshot(result.collector_evidence); }
         if (result.status === 'VALID' && claim.receipt === null) claim.receipt = result.collector_freshness.receipt;
         return snapshot(result);
       } finally { active = false; }
     },
     inspect() { return { claimedRequests: claims.size, gate: gate.inspectTool(),
       claims: [...claims.entries()].map(([requestDigest, value]) => snapshot({ requestDigest, intent: value.intent,
-        receipt: value.receipt, invalidReason: value.invalidReason })),
+        receipt: value.receipt, invalidReason: value.invalidReason, collector_evidence: value.evidence })),
       history: snapshot(history) }; },
   });
 }
