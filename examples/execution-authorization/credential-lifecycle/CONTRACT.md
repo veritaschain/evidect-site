@@ -240,6 +240,20 @@ change or checkpoint expiry, including at the final receiver-state read in witne
 A selection change alone remains `INDETERMINATE`. These checks do not observe later changes or
 establish continuous validity after the final read.
 
+Before creating a witness query, the verifier identifies the originally used receipt signer and
+selection from the completed adopted-key authentication. The first subsequent state read checks
+that signer's revocation in the same transaction as the current selection. Revocation plus adoption
+of a new key remains `INVALID`; a selection change alone remains `INDETERMINATE`. Neither sends a
+query. Missing or unverified information needed to identify the original authenticated selection
+also leaves the witness check `INDETERMINATE` without a query; a later selected key is not substituted.
+
+Revocation is keyed by signer fingerprint. A validated witness response for an older generation
+that marks the same receipt signer as revoked produces `INVALID / WITNESS_SIGNER_REVOKED`, even
+when the receiver has adopted a newer generation using that key. Revocation of a different key in
+an older witness selection does not revoke the current signer; it remains
+`INDETERMINATE / WITNESS_BEHIND_RECEIVER`. These are comparisons of the signed response's state,
+not observation of changes after that response or automatic adoption of witness keys or generations.
+
 Once the adapter has returned a result, failures of the final state read or final clock sample do
 not discard it or rerun verification without adopted trust. `FINAL_STATE_UNAVAILABLE` records an
 unavailable final read; `FINAL_STATE_INVALID` records a state contradiction found during that read.

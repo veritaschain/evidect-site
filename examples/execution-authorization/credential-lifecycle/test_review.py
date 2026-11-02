@@ -269,6 +269,107 @@ process.stdout.write(JSON.stringify({evidence, trust, expectation}));
                 self.assertEqual(len(after_actions), 1)
                 self.assertEqual(lab.databases(), after_actions[0])
 
+    def assert_witness_failure_export(self, destination, source, expected, reason):
+        manifest = review.write_review(destination, source, "verify-witness")
+        self.assertEqual({path.name for path in destination.iterdir()}, FILES)
+        raw_source = (destination / "verification.json").read_bytes()
+        self.assertEqual(raw_source, (json.dumps(source, ensure_ascii=True, indent=2, allow_nan=False) + "\n").encode("ascii"))
+        self.assertEqual(json.loads(raw_source), source)
+        projected = json.loads((destination / "review.json").read_bytes())
+        self.assert_headline(projected, expected, expected)
+        self.assertEqual(projected["receipt_checks"], source["receiver"]["receiver"]["handoff"]["authentication"]["checks"])
+        self.assertEqual(projected["identifiers"]["generation"], source["receiver"]["generation"])
+        self.assertEqual(projected["identifiers"]["checkpoint_sha256"], source["receiver"]["checkpoint_sha256"])
+        self.assertEqual(projected["identifiers"]["witness_query_sha256"], source["query_sha256"])
+        self.assertEqual(next(layer for layer in projected["layers"] if layer["id"] == "witness")["reason"], reason)
+        self.assert_diagnostic_text(projected, reason)
+        self.assertEqual(manifest["overall_status"], expected)
+        for filename, entry in manifest["files"].items():
+            raw = (destination / filename).read_bytes()
+            self.assertEqual(entry, {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+
+    def test_signed_older_witness_revocation_applies_only_to_the_same_used_receipt_key(self):
+        rotated_key = f.keypair()
+        for same_key, revoked in ((True, False), (True, True), (False, True)):
+            with self.subTest(same_receipt_key=same_key, witness_revoked=revoked):
+                directory = self.root / ("witness-lag-" + str(same_key) + "-" + str(revoked))
+                directory.mkdir(mode=0o700)
+                lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+                first = lab.delivery(); lab.adopt_pair(first)
+                second = lab.delivery(2, receipt_key=self.receipt_key if same_key else rotated_key)
+                self.assertEqual(lab.adopt_to(lab.store, second)["local_status"], "VALID")
+                if revoked:
+                    lab.witness_store.revoke(first["pin"]["key_fingerprint"])
+                before, inputs = lab.databases(), copy.deepcopy(second)
+                source = lab.verify(second)
+                expected = "INVALID" if same_key and revoked else "INDETERMINATE"
+                reason = "WITNESS_SIGNER_REVOKED" if same_key and revoked else "WITNESS_BEHIND_RECEIVER"
+                self.assertEqual((source["local_status"], source["overall_status"], source["witness_status"]),
+                                 (expected, expected, expected))
+                self.assertEqual(source["witness_reason"], reason)
+                self.assertEqual(source["receiver"]["local_status"], "VALID")
+                self.assertEqual(source["receiver"]["generation"], 2)
+                self.assertIsNotNone(source["query_sha256"])
+                self.assertIsNotNone(source["signed_witness_response"])
+                signed = source["signed_witness_response"]["payload"]["snapshot"]
+                self.assertEqual(signed["generation"], 1)
+                self.assertIs(signed["revoked"], revoked)
+                self.assertEqual(signed["signer_fingerprint"] == second["pin"]["key_fingerprint"], same_key)
+                self.assert_witness_failure_export(directory / "review", source, expected, reason)
+                self.assertEqual(lab.databases(), before)
+                self.assertEqual(second, inputs)
+
+    def test_used_receipt_revocation_before_first_witness_read_keeps_original_verification(self):
+        rotated_key = f.keypair()
+        for revoked, rotate in ((True, False), (True, True), (False, True)):
+            with self.subTest(used_key_revoked=revoked, new_key_adopted=rotate):
+                directory = self.root / ("before-witness-" + str(revoked) + "-" + str(rotate))
+                directory.mkdir(mode=0o700)
+                lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+                first = lab.delivery(); lab.adopt_pair(first)
+                second = lab.delivery(2, receipt_key=rotated_key) if rotate else None
+                inputs = copy.deepcopy(first)
+                clocks, after_actions, exchanges = [], [], []
+
+                def clock():
+                    clocks.append(1)
+                    if len(clocks) == 2:
+                        # The base verifier has already completed its final read.
+                        if revoked:
+                            lab.store.revoke(first["pin"]["key_fingerprint"])
+                        if second is not None:
+                            self.assertEqual(lab.adopt_to(lab.store, second)["local_status"], "VALID")
+                        after_actions.append(lab.databases())
+                    return lab.now
+
+                def no_exchange(_query):
+                    exchanges.append(1)
+                    raise AssertionError("A changed receiver state must not start a witness exchange")
+
+                source = f.witness.verify(lab.store, lab.adapter_for(first), lab.stream, f.KIND,
+                    first["package"], first["evidence"], lab.selected_trust(), no_exchange, clock=clock)
+                expected = "INVALID" if revoked else "INDETERMINATE"
+                reason = "RECEIVER_SIGNER_REVOKED" if revoked else "RECEIVER_STATE_CHANGED"
+                self.assertEqual((source["local_status"], source["overall_status"], source["witness_status"]),
+                                 (expected, expected, expected))
+                self.assertEqual(source["witness_reason"], reason)
+                self.assertEqual(source["receiver"]["local_status"], "VALID")
+                self.assertEqual(source["receiver"]["generation"], 1)
+                self.assertEqual(source["receiver"]["completed_at_unix"], lab.now)
+                self.assertIsNone(source["query_sha256"])
+                self.assertIsNone(source["signed_witness_response"])
+                self.assertIsNone(source["round_trip_ms"])
+                self.assertEqual(exchanges, [])
+                self.assertEqual(len(clocks), 2)
+                selected = lab.store.select(lab.stream, f.KIND, checked_fingerprint=first["pin"]["key_fingerprint"])
+                self.assertEqual(selected["generation"], 2 if rotate else 1)
+                self.assertIs(selected["checked_key_revoked"], revoked)
+                self.assertIs(selected["revoked"], revoked and not rotate)
+                self.assert_witness_failure_export(directory / "review", source, expected, reason)
+                self.assertEqual(len(after_actions), 1)
+                self.assertEqual(lab.databases(), after_actions[0])
+                self.assertEqual(first, inputs)
+
     def assert_final_failure_export(self, mode, *, bad_signature=False, state_failure=None,
                                     clock_failure=None, revoke=False):
         name = "-".join(map(str, (mode, bad_signature, state_failure, clock_failure, revoke)))

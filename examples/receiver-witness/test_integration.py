@@ -116,6 +116,70 @@ class WitnessIntegrationTests(unittest.TestCase):
         self.adopt_to(self.witness_store, "runtime", new)
         self.assertEqual(self.verify("runtime", new)["local_status"], "VALID")
 
+    def test_lagging_signed_witness_retains_same_key_revocation_for_newer_receiver(self):
+        for kind in self.adapters:
+            for revoked, rotated in ((False, False), (True, False), (True, True)):
+                with self.subTest(kind=kind, revoked=revoked, rotated=rotated):
+                    suffix = kind + "-lag-" + str(revoked) + "-" + str(rotated)
+                    self.store = base.Store.create(self.base / (suffix + "-receiver"))
+                    self.witness_store = base.Store.create(self.base / (suffix + "-witness"))
+                    first = self.setup_pair(kind)
+                    newer = self.delivery(kind, 2, 1 if rotated else 0)
+                    self.adopt_to(self.store, kind, newer)
+                    if revoked:
+                        self.witness_store.revoke(first["pin"]["key_fingerprint"])
+                    before = [store.path.read_bytes() for store in (self.store, self.witness_store)]
+                    result = w.verify(self.store, self.adapters[kind], kind, kind, newer["package"], newer["report"],
+                                      self.selected_trust(kind), self.transport(), clock=lambda: self.now)
+                    invalid = revoked and not rotated
+                    expected = "INVALID" if invalid else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["witness_reason"], "WITNESS_SIGNER_REVOKED" if invalid else "WITNESS_BEHIND_RECEIVER")
+                    self.assertEqual((result["receiver"]["local_status"], result["receiver"]["generation"]), ("VALID", 2))
+                    remote = result["signed_witness_response"]["payload"]["snapshot"]
+                    self.assertEqual(remote["generation"], 1)
+                    self.assertIs(remote["revoked"], revoked)
+                    self.assertEqual(remote["signer_fingerprint"], first["pin"]["key_fingerprint"])
+                    self.assertEqual(remote["signer_fingerprint"] == newer["pin"]["key_fingerprint"], not rotated)
+                    self.assertEqual([store.path.read_bytes() for store in (self.store, self.witness_store)], before)
+
+    def test_first_witness_read_checks_the_signer_used_before_receiver_rotation(self):
+        for kind in self.adapters:
+            for revoke, rotate in ((True, False), (True, True), (False, True)):
+                with self.subTest(kind=kind, revoke=revoke, rotate=rotate):
+                    suffix = kind + "-boundary-" + str(revoke) + "-" + str(rotate)
+                    self.store = base.Store.create(self.base / (suffix + "-receiver"))
+                    self.witness_store = base.Store.create(self.base / (suffix + "-witness"))
+                    first = self.setup_pair(kind)
+                    rotated = self.delivery(kind, 2, 1) if rotate else None
+                    selected_trust = self.selected_trust(kind)
+                    samples, exchanges, after_actions = [], [], []
+                    def clock():
+                        samples.append(1)
+                        # The base verifier has completed its final state read.
+                        if len(samples) == 2:
+                            if revoke:
+                                self.store.revoke(first["pin"]["key_fingerprint"])
+                            if rotate:
+                                self.adopt_to(self.store, kind, rotated)
+                            after_actions.append([store.path.read_bytes() for store in (self.store, self.witness_store)])
+                        return self.now
+                    result = w.verify(self.store, self.adapters[kind], kind, kind, first["package"], first["report"],
+                                      selected_trust, lambda query: exchanges.append(query), clock=clock)
+                    expected = "INVALID" if revoke else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["witness_reason"], "RECEIVER_SIGNER_REVOKED" if revoke else "RECEIVER_STATE_CHANGED")
+                    self.assertEqual((result["receiver"]["local_status"], result["receiver"]["generation"]), ("VALID", 1))
+                    self.assertIsNone(result["query_sha256"])
+                    self.assertIsNone(result["signed_witness_response"])
+                    self.assertEqual(exchanges, [])
+                    self.assertEqual(len(samples), 2)
+                    current = self.store.select(kind, kind, checked_fingerprint=first["pin"]["key_fingerprint"])
+                    self.assertEqual(current["generation"], 2 if rotate else 1)
+                    self.assertIs(current["revoked"], revoke and not rotate)
+                    self.assertIs(current["checked_key_revoked"], revoke)
+                    self.assertEqual([store.path.read_bytes() for store in (self.store, self.witness_store)], after_actions[0])
+
     def test_same_generation_different_signed_checkpoint_is_conflict(self):
         first, different = self.delivery("runtime"), self.delivery("runtime")
         self.assertNotEqual(first["pin"]["receipt_sha256"], different["pin"]["receipt_sha256"])

@@ -154,6 +154,32 @@ def _current_receiver(store, stream, kind, original):
     return selected
 
 
+def _verified_receiver_snapshot(evidence, kind):
+    """Recover the used signer only from this call's authenticated adapter result."""
+    try:
+        handoff = evidence["receiver"]["handoff"]
+        authentication = handoff["authentication"]
+        if (type(handoff) is not dict or handoff.get("format") != "evidect-handoff-verification/1" or
+                handoff.get("local_status") != "VALID" or handoff.get("baseline_usable") is not True or
+                type(authentication) is not dict or authentication.get("format") != "evidect-observation-authentication/1" or
+                authentication.get("local_status") != "VALID" or authentication.get("baseline_usable") is not True):
+            raise WitnessError("RECEIVER_VERIFICATION_METADATA_UNAVAILABLE")
+        checks = authentication.get("checks")
+        if (type(checks) is not list or len(checks) != 4 or
+                any(type(item) is not dict or item.get("status") != "VALID" for item in checks) or
+                {item.get("name") for item in checks} != {"receipt_digest", "signature", "checkpoint", "checkpoint_expiry"}):
+            raise WitnessError("RECEIVER_VERIFICATION_METADATA_UNAVAILABLE")
+        original = {"store_id": evidence["store_id"], "revision": evidence["state_revision"], "kind": kind,
+                    "generation": evidence["generation"], "checkpoint_sha256": evidence["checkpoint_sha256"],
+                    "signer_fingerprint": authentication["key_fingerprint"], "revoked": False}
+        validate_snapshot(original)
+        return original
+    except (KeyError, TypeError, WitnessError):
+        # Missing trusted-verifier metadata is not evidence of a contradiction.
+        # Never substitute a sender's key or the store's newly selected signer.
+        raise WitnessError("RECEIVER_VERIFICATION_METADATA_UNAVAILABLE") from None
+
+
 def validate_snapshot(value):
     exact(value, ("store_id", "revision", "kind", "generation", "checkpoint_sha256", "signer_fingerprint", "revoked"))
     if not matches(STORE_ID, value["store_id"]) or not integer(value["revision"]) or not integer(value["generation"], 1) or not (
@@ -211,6 +237,10 @@ def _comparison(local, witnessed):
     if witnessed["generation"] > local["generation"]:
         return "INVALID", "RECEIVER_BEHIND_WITNESS"
     if witnessed["generation"] < local["generation"]:
+        # Revocation applies to the key, even when the witness still holds an
+        # older checkpoint. An unrelated old signer's revocation does not.
+        if witnessed["revoked"] and witnessed["signer_fingerprint"] == local["signer_fingerprint"]:
+            return "INVALID", "WITNESS_SIGNER_REVOKED"
         return "INDETERMINATE", "WITNESS_BEHIND_RECEIVER"
     if witnessed["checkpoint_sha256"] != local["checkpoint_sha256"] or witnessed["signer_fingerprint"] != local["signer_fingerprint"]:
         return "INVALID", "CHECKPOINT_DISAGREEMENT"
@@ -232,9 +262,14 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
     signed, raw_query, duration = None, None, None
     try:
         expected = trust(selected_trust)
-        local = snapshot(store, stream, kind)
+        if evidence["local_status"] == "VALID":
+            local = _verified_receiver_snapshot(evidence, kind)
+        else:
+            local = snapshot(store, stream, kind)
         if local["store_id"] == expected["store_id"]:
             raise WitnessError("WITNESS_STORE_NOT_SEPARATE", "INVALID")
+        if evidence["local_status"] == "VALID":
+            _current_receiver(store, stream, kind, local)
         if (local["store_id"], local["revision"], local["checkpoint_sha256"]) != (
                 evidence["store_id"], evidence["state_revision"], evidence["checkpoint_sha256"]):
             raise WitnessError("RECEIVER_STATE_CHANGED")

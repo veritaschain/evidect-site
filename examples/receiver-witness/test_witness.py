@@ -46,7 +46,13 @@ class WitnessTests(unittest.TestCase):
             s = store.select(stream, kind)
             return {"local_status": "VALID", "overall_status": "INDETERMINATE", "store_id": s["store_id"],
                     "state_revision": s["revision"], "checkpoint_sha256": s["checkpoint_sha256"],
-                    "completed_at_unix": 1000}
+                    "generation": s["generation"], "completed_at_unix": 1000,
+                    "receiver": {"handoff": {"format": "evidect-handoff-verification/1", "local_status": "VALID",
+                        "baseline_usable": True, "authentication": {"format": "evidect-observation-authentication/1",
+                            "local_status": "VALID", "baseline_usable": True,
+                            "key_fingerprint": s["checkpoint"]["key_fingerprint"],
+                            "checks": [{"name": name, "status": "VALID"} for name in
+                                       ("receipt_digest", "signature", "checkpoint", "checkpoint_expiry")]}}}}
         self.base = types.SimpleNamespace(verify=verify, state=types.SimpleNamespace(identity=lambda *args: None),
                                           sample_time=lambda clock: int(clock()))
         self.patcher = patch.object(w, "load_receiver", return_value=self.base)
@@ -132,6 +138,22 @@ class WitnessTests(unittest.TestCase):
         result = self.check()
         self.assertEqual((result["local_status"], result["witness_reason"]), ("INDETERMINATE", "WITNESS_BEHIND_RECEIVER"))
 
+    def test_lagging_witness_revocation_applies_only_to_the_same_used_key(self):
+        for revoked, same_key in ((False, True), (True, True), (True, False)):
+            with self.subTest(revoked=revoked, same_key=same_key):
+                self.remote = FakeStore("2" * 32)
+                self.remote.selected.update(generation=1, revoked=revoked)
+                if not same_key:
+                    self.remote.selected["checkpoint"]["key_fingerprint"] = "c" * 64
+                result = self.check()
+                known_revoked = revoked and same_key
+                expected = "INVALID" if known_revoked else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["witness_reason"], "WITNESS_SIGNER_REVOKED" if known_revoked
+                                 else "WITNESS_BEHIND_RECEIVER")
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["signed_witness_response"])
+
     def test_same_generation_receipt_or_key_disagreement_is_invalid(self):
         for field in ("checkpoint_sha256", "checkpoint"):
             old = copy.deepcopy(self.remote.selected[field])
@@ -192,6 +214,65 @@ class WitnessTests(unittest.TestCase):
             response = self.reply(q); self.local.selected["revoked"] = True
             return response
         self.assertEqual(self.check(exchange)["witness_reason"], "RECEIVER_SIGNER_REVOKED")
+
+    def test_initial_witness_read_retains_used_key_revocation_after_base_verification(self):
+        original = self.base.verify
+        for revoke, rotate, same_store in ((True, False, False), (True, True, False),
+                                           (False, True, False), (False, True, True)):
+            with self.subTest(revoke=revoke, rotate=rotate, same_store=same_store):
+                self.local = FakeStore("1" * 32)
+                self.trust["store_id"] = "1" * 32 if same_store else "2" * 32
+                calls = []
+                def verify_then_change(*args, **kwargs):
+                    checked = original(*args, **kwargs)
+                    if revoke:
+                        self.local.revoked_fingerprints.add("b" * 64)
+                        self.local.selected["revoked"] = True
+                    if rotate:
+                        self.local.selected.update(generation=3, checkpoint_sha256="d" * 64, revoked=False)
+                        self.local.selected["checkpoint"]["key_fingerprint"] = "c" * 64
+                    self.local.selected["revision"] += 1
+                    return checked
+                with patch.object(self.base, "verify", side_effect=verify_then_change):
+                    result = self.check(lambda query: calls.append(query))
+                expected = "INVALID" if revoke or same_store else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["witness_reason"], "WITNESS_STORE_NOT_SEPARATE" if same_store else
+                                 "RECEIVER_SIGNER_REVOKED" if revoke else "RECEIVER_STATE_CHANGED")
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertEqual(result["receiver"]["generation"], 2)
+                self.assertIsNone(result["query_sha256"])
+                self.assertIsNone(result["signed_witness_response"])
+                self.assertEqual(calls, [])
+
+    def test_used_signer_requires_complete_verified_adapter_metadata(self):
+        original = self.base.verify
+        def remove_authentication(result):
+            del result["receiver"]["handoff"]["authentication"]
+        changes = [remove_authentication,
+            lambda result: result.update(generation=True),
+            lambda result: result["receiver"]["handoff"].update(baseline_usable=False)]
+        for field, value in (("format", "unsupported"), ("local_status", "INDETERMINATE"),
+                             ("baseline_usable", False), ("key_fingerprint", None),
+                             ("key_fingerprint", "B" * 64), ("key_fingerprint", True)):
+            changes.append(lambda result, field=field, value=value:
+                result["receiver"]["handoff"]["authentication"].update({field: value}))
+        for index in range(4):
+            changes.append(lambda result, index=index:
+                result["receiver"]["handoff"]["authentication"]["checks"][index].update(status="INDETERMINATE"))
+        for change in changes:
+            calls = []
+            def verify_with_bad_metadata(*args, **kwargs):
+                result = original(*args, **kwargs)
+                change(result)
+                return result
+            with self.subTest(change=change), patch.object(self.base, "verify", side_effect=verify_with_bad_metadata):
+                result = self.check(lambda query: calls.append(query))
+                self.assertEqual((result["local_status"], result["overall_status"]), ("INDETERMINATE", "INDETERMINATE"))
+                self.assertEqual(result["witness_reason"], "RECEIVER_VERIFICATION_METADATA_UNAVAILABLE")
+                self.assertIsNone(result["query_sha256"])
+                self.assertIsNone(result["signed_witness_response"])
+                self.assertEqual(calls, [])
 
     def test_used_key_revocation_is_not_hidden_by_a_new_selection(self):
         for revoked in (False, True):
