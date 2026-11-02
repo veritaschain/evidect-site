@@ -109,7 +109,7 @@ demoが出力する保存資料には、この秘密鍵や稼働中のwitness DB
 | 保存ファイル | 内容 |
 |---|---|
 | `verification.json` | 今回の検証で返された元の結果。標準出力の判定と同じ |
-| `review.json` | `evidect-credential-review/1`。総合判定、限定された検査、実施状況、残る保証を分けた派生表示 |
+| `review.json` | `evidect-credential-review/2`。総合判定、限定された検査、実施状況、残る保証を分けた派生表示 |
 | `review.html` | ブラウザーで読む静的な日本語レポート |
 | `review.md` | Markdownで読む同じ範囲のレポート |
 | `manifest.json` | `evidect-credential-review-manifest/1`。未署名のファイルhash一覧。照合用であり、信頼の根拠ではない |
@@ -135,7 +135,8 @@ python3 -I -B examples/execution-authorization/credential-lifecycle/test_review.
 python3 -I -B examples/execution-authorization/credential-lifecycle/review-demo.py --output credential-review-output
 ```
 
-このdemoは5種類の検証結果から、各5ファイルの表示を作ります。未確定・不一致やwitness未実施の表示を含みます。
+このdemoは10種類の検証結果から、各5ファイルの表示を作ります。未確定・不一致やwitness未実施に加え、
+inventoryの差分、receipt署名不一致、期限切れ、inventory未検査、未対応のprovider記録を含みます。
 表示例の試験成功は、その検証結果が総合的に有効だったことを意味しません。
 
 ## 結果の読み方
@@ -166,6 +167,40 @@ UIや結果表示では、最上段の「総合判定」を優先し、その下
 `REVERIFIED`は再検証を実行したという実施状況であり、その再検証結果は`INVALID`の場合もあります。
 `verify-local`のwitness欄は未実施として扱い、結果がない項目を成功や0件へ補完しません。
 いずれも本番認可・実行承認・法令適合の合格表示ではありません。
+
+## 診断から再確認へ
+
+表示形式`evidect-credential-review/2`は、元の検証が返した診断を保持します。新しい照合や原因の推測を
+追加するものではありません。最初に総合判定を読み、次に以下の内訳で、不足・不一致の対象を特定します。
+
+| 診断 | 読み方 |
+|---|---|
+| inventoryが`COMPARED` | 差分は計算済み。欠落と余分をそれぞれ件数・要求digestで確認する。両方が同時に存在する場合もある |
+| `EXPECTATION_UNAVAILABLE` | 期待集合と差分は未確定。受領側で数えた件数があっても、期待側の件数や欠落なしを推定しない |
+| `NOT_CHECKED`、またはinventory内訳なし | 件数・差分は未確認。元の結果の初期値0・空配列を、0件や差分なしとして扱わない |
+| receipt検査の内訳 | 記録されているdigest・署名と指定鍵・checkpoint・期限のstatusとreasonを個別に読む |
+| context・trustの検査 | 元の全体検査のstatusとreason。`REVERIFIED`という実施状況だけでは分からない失敗原因を確認する |
+| provider全体の相関 | 要求ごとの対応に加え、全体のstatusとreason、計算済みなら未対応provider request IDを確認する |
+
+`null`は内訳や計算結果を取得できていないことを表します。計算済みの空の差分・未対応ID一覧だけが、
+その比較範囲内で該当なしという意味です。全履歴の完全性は確認しません。
+receipt検査では、公開鍵未指定による未確認と、署名・鍵の不一致を区別します。checkpoint未指定で期限の行が
+ない場合や、内訳を取得できなかった場合に、期限や署名の成功・失敗を補いません。「結果が記録されている」と
+「暗号検査を実施できた」も同じ意味ではありません。
+
+再確認は、元の署名と受領者が採用した範囲を維持したまま、原因ごとに進めます。
+
+| 表示された不足・不一致 | 次に確認すること |
+|---|---|
+| inventory未検査・期待集合未確定 | 原入力の形式と、受領者が別途選んだexpectationのcontext・要求集合を確認する。受信した資料から期待集合を作り直さない |
+| 欠落・余分の要求 | 表示されたdigestで原envelopeと配送対象を確認し、不足する原資料を揃える。欠落項目を期待集合から削除して一致させない |
+| receiptの署名・指定鍵・checkpoint不一致 | 原receiptと、受領者が別管理する公開鍵・採用状態の対応を確認する。配布物の鍵へ自動で置き換えない |
+| checkpoint期限切れ | 現在の採用方針とローカル時計を確認する。更新が必要なら管理者が新しい世代を明示採用する。旧checkpointの期限を書き換えて一致させない |
+| 未対応provider記録・witnessの不足や不一致 | 表示されたID・理由を使って対象の記録と設定・保存状態を確認する。witness確認が必要なレビューをlocal-onlyの一致で解消した扱いにしない |
+
+材料や管理者の採用状態を適切に整えた後、必要な元の検証モードで`receive.py`を再実行し、新しい出力先へ保存します。
+再実行には原package・evidence・選択trust・expectationと現在の受領者状態が必要です。保存したレポートの編集や、
+manifestのhash再計算は再検証になりません。元の`verification.json`は、その実行の記録として保持します。
 
 元のオフライン結果は変更せず、`historical_authorization: NOT_ASSESSED`と、現在のcollectorの鮮度、
 provider観測の真正性、ログ全体の完全性、pack全体の真正性の`NOT_ESTABLISHED`を維持します。

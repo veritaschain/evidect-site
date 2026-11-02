@@ -16,7 +16,7 @@ _spec = importlib.util.spec_from_file_location("evidect_review_result_contract",
 handoff = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(handoff)
 
-FORMAT = "evidect-credential-review/1"
+FORMAT = "evidect-credential-review/2"
 MANIFEST_FORMAT = "evidect-credential-review-manifest/1"
 MAX_SOURCE_BYTES = 256 * 1024
 MAX_REVIEW_BYTES = 512 * 1024
@@ -37,6 +37,10 @@ VIEW_FLAGS = {**COMMON_FLAGS, "external_anchor_verified": False,
 LABELS = {"VALID": "限定範囲の一致", "INVALID": "不一致", "INDETERMINATE": "未確定", "NOT_PERFORMED": "未実施"}
 LAYER_LABELS = {"credential": "元の資格情報証拠", "receipt_binding": "受領署名と三入力の結合",
                 "receiver_state": "保存状態を含む受取検証", "witness": "別保存の状態との witness 照合"}
+INVENTORY_COMPARED_REASONS = ("EXPECTED_REQUEST_INVENTORY_MATCH", "EXPECTED_REQUEST_EVIDENCE_MISSING", "UNEXPECTED_SIGNED_REQUEST")
+PROVIDER_COMPARED_REASONS = ("PROVIDER_CORRELATION_CONTRADICTION", "MATCHING_OBSERVATION_MISSING",
+                             "UNATTRIBUTED_PROVIDER_RECORDS", "SCOPED_PROVIDER_RECORDS_CONSISTENT")
+ASSESSMENT_LABELS = {"COMPARED": "比較済み", "EXPECTATION_UNAVAILABLE": "比較基準が利用不能", "NOT_CHECKED": "未計算"}
 LIMITATIONS = (
     "これは未署名で編集可能な派生表示です。原証拠、再検証、認証書の代わりにはなりません。",
     "結果は元の検証実行で記録された範囲のものです。保存・後日閲覧によって検証や鮮度が更新されることはありません。",
@@ -292,6 +296,30 @@ def _source(result, mode):
     return value, None, value["receiver"], None
 
 
+def _inventory_assessment(reason):
+    if reason in INVENTORY_COMPARED_REASONS:
+        return "COMPARED"
+    return "EXPECTATION_UNAVAILABLE" if reason == "RECEIVER_EXPECTATION_UNAVAILABLE" else "NOT_CHECKED"
+
+
+def _inventory_projection(inventory):
+    assessment = _inventory_assessment(inventory["reason"])
+    compared = assessment == "COMPARED"
+    return {"status": inventory["status"], "reason": inventory["reason"], "assessment": assessment,
+            "expected_count": inventory["expected_count"] if compared else None,
+            "supplied_unique_count": inventory["supplied_unique_count"] if assessment != "NOT_CHECKED" else None,
+            "missing_request_digests": _owned(inventory["missing_request_digests"]) if compared else None,
+            "unexpected_request_digests": _owned(inventory["unexpected_request_digests"]) if compared else None}
+
+
+def _provider_projection(correlation):
+    # An initial [] says nothing about unmatched records until correlation has
+    # actually compared the observation. A missing observation stays unknown.
+    ids = correlation["unattributedProviderRequestIds"] if correlation["reason"] in PROVIDER_COMPARED_REASONS else None
+    return {"status": correlation["status"], "reason": correlation["reason"],
+            "unattributed_provider_request_ids": _owned(ids)}
+
+
 def build_review(result, mode):
     """Project only a freshly returned in-memory result; does not authenticate arbitrary report dictionaries."""
     source, state, adapter, witnessed = _source(result, mode)
@@ -335,11 +363,16 @@ def build_review(result, mode):
     identifiers.update({key: state[key] if state else None for key in ("checkpoint_sha256", "store_id", "generation", "state_revision")})
     identifiers["witness_query_sha256"] = witnessed["query_sha256"] if witnessed else None
     at = state["evaluated_at_unix"] if state else adapter["verification"]["evaluated_at_unix"] if adapter else None
+    authentication = adapter["handoff"].get("authentication") if adapter else None
     result = {"format": FORMAT, "mode": mode, "source": {"format": source["format"], "sha256": _digest(raw_source), "bytes": len(raw_source)},
               "local_status": source["local_status"], "overall_status": source["overall_status"],
               "recorded_time": {"evaluated_at_unix": at, "completed_at_unix": state["completed_at_unix"] if state else None,
                                 "clock": "LOCAL_UNATTESTED"},
-              "layers": layers, "inventory": _owned(offline["inventory"]) if offline else None,
+              "layers": layers,
+              "credential_checks": [{"name": name, **offline[name]} for name in ("context_binding", "trust_material")] if offline else None,
+              "receipt_checks": _owned(authentication["checks"]) if authentication else None,
+              "inventory": _inventory_projection(offline["inventory"]) if offline else None,
+              "provider_correlation": _provider_projection(offline["provider_correlation"]) if offline else None,
               "attempts": attempts, "identifiers": identifiers, **VIEW_FLAGS, "limitations": list(LIMITATIONS)}
     _json_bytes(result)
     return result
@@ -348,6 +381,7 @@ def build_review(result, mode):
 def _view(review):
     value = _owned(review)
     _exact(value, ("format", "mode", "source", "local_status", "overall_status", "recorded_time", "layers", "inventory", "attempts",
+                   "credential_checks", "receipt_checks", "provider_correlation",
                    "identifiers", *VIEW_FLAGS, "limitations"))
     _need(value["format"] == FORMAT and value["mode"] in ("verify-local", "verify-witness"))
     _statuses(value)
@@ -367,6 +401,20 @@ def _view(review):
               type(layer["label"]) is str and type(layer["reason"]) is str)
         _need((layer["status"] == "NOT_PERFORMED") == (key == "witness" and value["mode"] == "verify-local"))
     _preserves(value["local_status"], [item["status"] for item in value["layers"] if item["status"] != "NOT_PERFORMED"])
+    for field, names in (("credential_checks", ("context_binding", "trust_material")),
+                         ("receipt_checks", ("receipt_digest", "signature", "checkpoint", "checkpoint_expiry"))):
+        checks = value[field]
+        if checks is None:
+            continue
+        _need(type(checks) is list and 1 <= len(checks) <= len(names))
+        seen = set()
+        for check in checks:
+            _exact(check, ("name", "status", "reason"))
+            _need(check["name"] in names and check["name"] not in seen and check["status"] in STATES and type(check["reason"]) is str)
+            seen.add(check["name"])
+        _need(seen == set(names) if field == "credential_checks" else {"receipt_digest", "signature", "checkpoint"}.issubset(seen))
+        layer_index = 0 if field == "credential_checks" else 1
+        _preserves(value["layers"][layer_index]["status"], [check["status"] for check in checks])
     _need(type(value["attempts"]) is list and len(value["attempts"]) <= 64)
     for attempt in value["attempts"]:
         _exact(attempt, ("index", "request_digest", "status", "checks", "provider_correlation"))
@@ -381,11 +429,30 @@ def _view(review):
               all(p[key] is None or type(p[key]) is str for key in ("dispatch_id", "provider_request_id", "association_source")))
     if value["inventory"] is not None:
         inventory = value["inventory"]
-        _exact(inventory, ("status", "reason", "expected_count", "supplied_unique_count", "missing_request_digests", "unexpected_request_digests"))
-        _need(inventory["status"] in STATES and type(inventory["reason"]) is str and all(
-            _integer(inventory[key], maximum=64) for key in ("expected_count", "supplied_unique_count")))
-        _need(all(type(inventory[key]) is list and len(inventory[key]) <= 64 and all(_hash_value(item) for item in inventory[key])
-                  for key in ("missing_request_digests", "unexpected_request_digests")))
+        _exact(inventory, ("status", "reason", "assessment", "expected_count", "supplied_unique_count", "missing_request_digests", "unexpected_request_digests"))
+        _need(inventory["status"] in STATES and type(inventory["reason"]) is str and
+              inventory["assessment"] == _inventory_assessment(inventory["reason"]))
+        compared = inventory["assessment"] == "COMPARED"
+        _need(_integer(inventory["expected_count"], maximum=64) if compared else inventory["expected_count"] is None)
+        _need(inventory["supplied_unique_count"] is None if inventory["assessment"] == "NOT_CHECKED" else
+              _integer(inventory["supplied_unique_count"], maximum=64))
+        for key in ("missing_request_digests", "unexpected_request_digests"):
+            _need(type(inventory[key]) is list and len(inventory[key]) <= 64 and all(_hash_value(item) for item in inventory[key])
+                  if compared else inventory[key] is None)
+    correlation = value["provider_correlation"]
+    if correlation is not None:
+        _exact(correlation, ("status", "reason", "unattributed_provider_request_ids"))
+        _need(correlation["status"] in ("CONSISTENT", "INVALID", "INDETERMINATE") and type(correlation["reason"]) is str)
+        ids = correlation["unattributed_provider_request_ids"]
+        _need(ids is None or (type(ids) is list and len(ids) <= 256 and
+              all(type(item) is str and handoff.ID.fullmatch(item) is not None for item in ids)))
+        _need(correlation["reason"] in PROVIDER_COMPARED_REASONS or ids is None)
+    has_offline = value["credential_checks"] is not None
+    _need((value["inventory"] is not None) == has_offline and (correlation is not None) == has_offline)
+    if has_offline:
+        _preserves(value["layers"][0]["status"], [value["inventory"]["status"],
+                   "VALID" if correlation["status"] == "CONSISTENT" else correlation["status"],
+                   *(attempt["status"] for attempt in value["attempts"])])
     _exact(value["identifiers"], ("package_sha256", "evidence_sha256", "trust_sha256", "expectation_sha256", "checkpoint_sha256",
                                  "store_id", "generation", "state_revision", "witness_query_sha256"))
     for key, item in value["identifiers"].items():
@@ -411,23 +478,42 @@ def _utc(value):
 def render_html(review):
     value = _view(review)
     e = lambda item: escape(_text(item), quote=True)
+    def check_table(checks, caption):
+        if checks is None:
+            return '<p>検査結果は未記録です。実施された検査を補完していません。</p>'
+        check_rows = "".join('<tr><th scope="row"><code>' + e(c["name"]) + '</code></th><td>' + e(LABELS[c["status"]]) +
+            ' <code>' + e(c["status"]) + '</code></td><td><code>' + e(c["reason"]) + '</code></td></tr>' for c in checks)
+        return ('<table><caption>' + e(caption) + '</caption><thead><tr><th scope="col">検査</th><th scope="col">判定</th>' +
+                '<th scope="col">理由</th></tr></thead><tbody>' + check_rows + '</tbody></table>')
+    def id_list(values, identifier, heading):
+        content = '<p>未計算・未確認です。</p>' if values is None else ('<p>件数: ' + e(len(values)) + ' 件</p>' + (
+            '<ul>' + ''.join('<li class="hash"><code>' + e(item) + '</code></li>' for item in values) + '</ul>' if values else
+            '<p>比較済み：該当なし。</p>'))
+        return '<div id="' + e(identifier) + '"><h3>' + e(heading) + '</h3>' + content + '</div>'
     rows = "".join('<tr><th scope="row">' + e(row["label"]) + '</th><td><strong>' + e(LABELS[row["status"]]) +
         '</strong><br><code>' + e(row["status"]) + '</code></td><td><code>' + e(row["reason"]) +
         '</code><p class="small">記録区分: ' + e(row["availability"]) + '</p></td></tr>' for row in value["layers"])
     inventory = value["inventory"]
     counts = '<p>要求 inventory は未記録です。件数は補完していません。</p>' if inventory is None else (
-        '<p>記録された期待要求数: <strong>' + e(inventory.get("expected_count")) + '</strong> ／ 受領した一意の要求数: <strong>' +
-        e(inventory.get("supplied_unique_count")) + '</strong></p><p>inventory 判定: <code>' + e(inventory.get("status")) +
-        '</code> / <code>' + e(inventory.get("reason")) + '</code></p>')
+        '<p>計算状況: <strong>' + e(ASSESSMENT_LABELS[inventory["assessment"]]) + '</strong> <code>' + e(inventory["assessment"]) +
+        '</code></p><p>記録された期待要求数: <strong>' + e(inventory["expected_count"] if inventory["expected_count"] is not None else '未計算') +
+        '</strong> ／ 受領した一意の要求数: <strong>' + e(inventory["supplied_unique_count"] if inventory["supplied_unique_count"] is not None else '未計算') +
+        '</strong></p><p>inventory 判定: <code>' + e(inventory["status"]) + '</code> / <code>' + e(inventory["reason"]) + '</code></p>')
+    differences = id_list(inventory["missing_request_digests"] if inventory else None,
+                          'missing-request-digests', '不足している要求の digest') + id_list(
+                          inventory["unexpected_request_digests"] if inventory else None,
+                          'unexpected-request-digests', '期待に含まれない要求の digest')
+    correlation = value["provider_correlation"]
+    provider_summary = '<p>provider 観測全体の照合結果は未記録です。</p>' if correlation is None else (
+        '<p>全体の provider 相関: <code>' + e(correlation["status"]) + '</code> / <code>' + e(correlation["reason"]) + '</code></p>')
+    provider_summary += id_list(correlation["unattributed_provider_request_ids"] if correlation else None,
+                                'unattributed-provider-request-ids', '照合対象の要求に対応付いていない provider request ID')
     details = []
     for attempt in value["attempts"]:
-        checks = "".join('<tr><th scope="row"><code>' + e(c["name"]) + '</code></th><td>' + e(LABELS[c["status"]]) +
-            ' <code>' + e(c["status"]) + '</code></td><td><code>' + e(c["reason"]) + '</code></td></tr>' for c in attempt["checks"])
         provider = attempt["provider_correlation"]
         details.append('<details><summary>要求 ' + e(attempt["index"] + 1) + ' — ' + e(LABELS[attempt["status"]]) +
             ' (' + e(attempt["status"]) + ')</summary><p>request digest</p><p class="hash">' + e(attempt["request_digest"]) +
-            '</p><table><caption>元の署名と対応関係の再検証</caption><thead><tr><th scope="col">検査</th><th scope="col">判定</th><th scope="col">理由</th></tr></thead><tbody>' +
-            checks + '</tbody></table><p>provider 相関: <code>' + e(provider["status"]) + '</code> / <code>' + e(provider["reason"]) +
+            '</p>' + check_table(attempt["checks"], '元の署名と対応関係の再検証') + '<p>provider 相関: <code>' + e(provider["status"]) + '</code> / <code>' + e(provider["reason"]) +
             '</code></p><dl><dt>dispatch ID</dt><dd>' + e(provider["dispatch_id"]) + '</dd><dt>provider request ID</dt><dd>' +
             e(provider["provider_request_id"]) + '</dd><dt>対応の根拠</dt><dd>' + e(provider["association_source"]) + '</dd></dl></details>')
     identifiers = "".join('<dt><code>' + e(key) + '</code></dt><dd class="hash">' + e(item) + '</dd>' for key, item in value["identifiers"].items())
@@ -459,7 +545,12 @@ table tbody,table tr,table th,table td{display:block}table tr{padding:9px 0;bord
         e(time_label) + '</p><p>開始: ' + e(_utc(value["recorded_time"]["evaluated_at_unix"])) + '<br>完了: ' +
         e(_utc(value["recorded_time"]["completed_at_unix"])) + '''</p><p>内側の限定検査の一致は、外側の不一致・未確定を取り消しません。</p></section>
 <section><h2>検証の層ごとの記録</h2><table><caption>各層の限定された判断</caption><thead><tr><th scope="col">対象</th><th scope="col">判定</th><th scope="col">理由</th></tr></thead><tbody>''' + rows + '''</tbody></table></section>
-<section><h2>要求と provider 観測の対応</h2>''' + counts + (''.join(details) if details else '<p>要求ごとの再検証結果は未記録です。</p>') + '''
+<section id="credential-checks"><h2>資格情報証拠全体の検査</h2>''' + check_table(value["credential_checks"], 'context と受取側が選択した trust の検査') + '''</section>
+<section id="receipt-checks"><h2>受領署名の検査</h2>''' + check_table(value["receipt_checks"], '記録された受領署名・checkpoint の検査') + '''</section>
+<section id="review-inventory"><h2>要求 inventory の照合</h2>''' + counts + differences + '''<p class="small">差分は指定された期待集合との比較に限ります。</p></section>
+<section id="provider-correlation"><h2>provider 観測全体の対応</h2>''' + provider_summary + '''
+<p class="small">対応付かなかった ID は、受領した観測記録内の照合結果です。ログ全体の網羅性や不正実行を認定するものではありません。</p></section>
+<section><h2>要求と provider 観測の対応</h2>''' + (''.join(details) if details else '<p>要求ごとの再検証結果は未記録です。</p>') + '''
 <p class="small">相関の一致は未署名の観測記録の内部整合です。実在性・完全性・実行許可を証明しません。</p></section>
 <section><h2>常に残る確認範囲</h2><p>collector の現在鮮度: <code>NOT_ESTABLISHED</code><br>witness の現在鮮度: <code>NOT_ESTABLISHED</code><br>両保存状態の同時巻き戻し: <code>NOT_DETECTED</code></p><ul>''' + limits + '''</ul></section>
 <section><h2>元の検証結果と照合用識別子</h2><p>元の形式: <code>''' + e(value["source"]["format"]) + '</code></p><p>verification.json の bytes: ' +
@@ -483,6 +574,17 @@ def _md(value):
 
 def render_markdown(review):
     value = _view(review)
+    def check_lines(checks):
+        if checks is None:
+            return ["検査結果は未記録です。実施された検査を補完していません。", ""]
+        return ["| 検査 | 判定 | 理由 |", "| --- | --- | --- |", *[
+            "| " + " | ".join(_md(c[key]) for key in ("name", "status", "reason")) + " |" for c in checks], ""]
+    def id_lines(values, heading):
+        lines = ["### " + heading, ""]
+        if values is None:
+            return [*lines, "未計算・未確認です。", ""]
+        return [*lines, "件数: " + _md(len(values)) + " 件", "",
+                *(["- " + _md(item) for item in values] if values else ["比較済み：該当なし。"]), ""]
     lines = ["# EVIDECT 資格情報証拠レビュー", "", "未署名・編集可能な派生表示です。保存・後日閲覧によって検証や現在の鮮度は更新されません。", "",
              "## 確認時点の結論", "", "**総合判定：" + LABELS[value["overall_status"]] + "（" + value["overall_status"] + "）**", "",
              "受取検証：" + LABELS[value["local_status"]] + "（" + value["local_status"] + "）", "",
@@ -493,17 +595,34 @@ def render_markdown(review):
              "## 検証の層ごとの記録", "", "| 対象 | 判定 | 理由 | 記録区分 |", "| --- | --- | --- | --- |"]
     for row in value["layers"]:
         lines.append("| " + " | ".join(_md(item) for item in (row["label"], LABELS[row["status"]] + " (" + row["status"] + ")", row["reason"], row["availability"])) + " |")
-    lines += ["", "内側の限定検査の一致は、外側の不一致・未確定を取り消しません。", "", "## 要求と provider 観測の対応", ""]
-    if value["inventory"] is None:
+    lines += ["", "内側の限定検査の一致は、外側の不一致・未確定を取り消しません。", "", "## 資格情報証拠全体の検査", ""]
+    lines += check_lines(value["credential_checks"])
+    lines += ["## 受領署名の検査", ""]
+    lines += check_lines(value["receipt_checks"])
+    lines += ["## 要求 inventory の照合", ""]
+    inventory = value["inventory"]
+    if inventory is None:
         lines += ["要求 inventory は未記録です。件数は補完していません。", ""]
     else:
-        inventory = value["inventory"]
-        lines += ["記録された期待要求数: " + _md(inventory.get("expected_count")) + " ／ 受領した一意の要求数: " + _md(inventory.get("supplied_unique_count")), "",
-                  "inventory 判定: " + _md(inventory.get("status")) + " / " + _md(inventory.get("reason")), ""]
+        lines += ["計算状況: " + _md(ASSESSMENT_LABELS[inventory["assessment"]]) + " " + _md(inventory["assessment"]), "",
+                  "記録された期待要求数: " + _md(inventory["expected_count"] if inventory["expected_count"] is not None else "未計算") +
+                  " ／ 受領した一意の要求数: " + _md(inventory["supplied_unique_count"] if inventory["supplied_unique_count"] is not None else "未計算"), "",
+                  "inventory 判定: " + _md(inventory["status"]) + " / " + _md(inventory["reason"]), ""]
+    lines += id_lines(inventory["missing_request_digests"] if inventory else None, "不足している要求の digest")
+    lines += id_lines(inventory["unexpected_request_digests"] if inventory else None, "期待に含まれない要求の digest")
+    lines += ["差分は指定された期待集合との比較に限ります。", "", "## provider 観測全体の対応", ""]
+    correlation = value["provider_correlation"]
+    if correlation is None:
+        lines += ["provider 観測全体の照合結果は未記録です。", ""]
+    else:
+        lines += ["全体の provider 相関: " + _md(correlation["status"]) + " / " + _md(correlation["reason"]), ""]
+    lines += id_lines(correlation["unattributed_provider_request_ids"] if correlation else None, "照合対象の要求に対応付いていない provider request ID")
+    lines += ["対応付かなかった ID は、受領した観測記録内の照合結果です。ログ全体の網羅性や不正実行を認定するものではありません。", "",
+              "## 要求と provider 観測の対応", ""]
     for attempt in value["attempts"]:
         lines += ["### 要求 " + str(attempt["index"] + 1), "", "判定: " + _md(attempt["status"]), "",
-                  "request digest: " + _md(attempt["request_digest"]), "", "| 検査 | 判定 | 理由 |", "| --- | --- | --- |"]
-        lines += ["| " + " | ".join(_md(c[key]) for key in ("name", "status", "reason")) + " |" for c in attempt["checks"]]
+                  "request digest: " + _md(attempt["request_digest"]), ""]
+        lines += check_lines(attempt["checks"])
         provider = attempt["provider_correlation"]
         lines += ["", "provider 相関: " + _md(provider["status"]) + " / " + _md(provider["reason"]), "",
                   "- dispatch ID: " + _md(provider["dispatch_id"]), "- provider request ID: " + _md(provider["provider_request_id"]),
@@ -538,7 +657,12 @@ def write_review(output_directory, result, mode):
     _need(type(output_directory) is str or isinstance(output_directory, Path))
     output = Path(output_directory)
     _need(str(output) not in ("", ".") and output.name not in ("", ".", ".."))
-    parent = output.parent.resolve(strict=True)
+    try:
+        parent = output.parent.resolve(strict=True)
+    except RuntimeError:
+        # Python 3.12 and earlier use RuntimeError for a symlink loop. Keep this
+        # filesystem failure inside the CLI's static export-error boundary.
+        raise ReviewError("REVIEW_INPUT_OR_CONTRACT_INVALID") from None
     parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     directory_fd = None
     manifest_created = False

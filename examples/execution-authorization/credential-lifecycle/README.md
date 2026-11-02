@@ -216,13 +216,16 @@ provider記録の真実性・履歴全体の完全性・pack全体の真正性�
 最上位の総合判定を先に示し、内側の`VALID`や`REVERIFIED`を総合成功へ置き換えません。
 未署名で編集可能な保存レポートであり、開き直しても現在のwitnessやcollectorの鮮度は更新されません。
 元のevidence・trust・expectation、署名対象のinstruction、秘密鍵はこの出力へコピーしません。
+表示形式`evidect-credential-review/2`は、欠落・余分の要求digest、receipt検査の内訳、元のcontext・trust・
+provider全体の相関結果も示します。未検査の件数や差分は未確認のまま残し、0件や「差分なし」にしません。
+[診断から再確認する手順](WITNESS.md#診断から再確認へ)では、原入力と受領者の採用状態を確認する順序を説明しています。
 
 ## CIと残る範囲
 
 [credential-lifecycle CI](../../../.github/workflows/credential-lifecycle.yml)はUbuntu 24.04とmacOS 15、
 Node.js 22とPython 3.12でlifecycle・相関・オフライン再検証・既存gateと、追加の受領/witness経路を試験します。
 旧demoの18ケースに加え、5要求のオフライン用資料を生成し、別プロセスのCLIで再検証します。
-受領/witness用の固定合成demoに加え、保存レポートのテストと5種類の表示例を実行します。
+受領/witness用の固定合成demoに加え、保存レポートのテストと10種類の表示例を実行します。
 上位が未確定・不一致の場合に、内側の一致だけで成功表示にならないことも確認します。
 テストログ、report、生成したevidence・trust・expectation、再検証結果、受領/witness demoと保存表示例の公開用出力、
 実際にcheckoutしたcommitと、依存する受領・witness・receipt処理を含むソースおよび生成ファイルのhashを

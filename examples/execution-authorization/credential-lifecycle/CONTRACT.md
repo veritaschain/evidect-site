@@ -238,6 +238,29 @@ contradiction makes it `INVALID`. `REVERIFIED` records that a recomputation ran;
 `witness_integrated` and scenario `PASS` are not substitutes for a verification verdict. Missing
 components are not filled with `VALID`, zero events or an implied successful witness check.
 
+The review projection uses `evidect-credential-review/2`; the original verification and manifest
+formats are unchanged. `credential_checks` retains the original context and trust status/reason
+components, and `receipt_checks` retains the actual receipt authentication checks. Either field is
+null when that diagnostic detail is unavailable. Each checks list uses `name`, `status` and `reason`;
+the credential check names are `context_binding` and `trust_material`. Missing expiry or signature checks are not
+invented, and a recorded indeterminate result does not imply that cryptographic verification ran.
+The top-level `provider_correlation` uses `status`, `reason` and `unattributed_provider_request_ids`,
+retaining the original status/reason and any computed unattributed provider request IDs. A null ID list means unresolved; an empty computed list means no unmatched
+records within the supplied scope, not complete provider history.
+
+The inventory projection adds an assessment without changing the original verification result.
+`COMPARED` is used only for the existing match, missing-request and unexpected-request outcomes;
+it preserves both counts and both digest lists. `EXPECTATION_UNAVAILABLE` preserves only the
+supplied unique count; the expected count and both difference lists are null. `NOT_CHECKED` makes
+both counts and both lists null. An absent offline result leaves the entire inventory null. These
+unknowns must not be rendered as zero events, no missing evidence or a successful comparison.
+
+Review and remediation use the original recorded checks. Do not narrow the adopted expected
+inventory or edit an old checkpoint's expiry merely to make the inputs agree. A genuine scope or
+checkpoint update remains a separate explicit operator decision. Later verification uses the
+original input materials and the current receiver selection; changing a saved review or its
+manifest does not resolve a signature, binding or state contradiction.
+
 All saved views describe the verification run, not the time at which a reader opens the file.
 The time is from an unattested local clock. Recorded witness agreement does not become a new
 live challenge, establish current collector freshness, or attest that a saved report remains

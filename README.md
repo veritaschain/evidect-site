@@ -73,8 +73,10 @@ binds the exact evidence, selected trust and expected inventory bytes to a signe
 and explicitly adopted receiver state. It compares separate local stores under one controller;
 matching checks leave the overall result INDETERMINATE, and rollback of both stores remains undetected.
 The [saved review reports](examples/execution-authorization/credential-lifecycle/WITNESS.md#検証結果を保存する)
-present that verification run as unsigned HTML, Markdown and JSON. They do not refresh witness state
-when opened or convert a limited local match into production approval.
+present that verification run as unsigned HTML, Markdown and JSON. Inventory differences, receipt
+checks and the original context, trust and provider-correlation reasons remain available for review;
+unperformed comparisons remain unknown. The reports do not refresh witness state when opened or
+convert a limited local match into production approval.
 
 ```sh
 node --test examples/execution-authorization/credential-lifecycle/lifecycle.test.mjs

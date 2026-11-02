@@ -41,6 +41,26 @@ class Elements(HTMLParser):
         self.text.append(value)
 
 
+class SectionText(HTMLParser):
+    def __init__(self, section_id):
+        super().__init__(convert_charrefs=True)
+        self.section_id, self.depth, self.found, self.text = section_id, 0, False, []
+
+    def handle_starttag(self, tag, attrs):
+        if self.depth:
+            self.depth += tag not in {"br", "hr", "img", "input", "meta", "link"}
+        elif dict(attrs).get("id") == self.section_id:
+            self.depth, self.found = 1, True
+
+    def handle_endtag(self, tag):
+        if self.depth:
+            self.depth -= 1
+
+    def handle_data(self, value):
+        if self.depth:
+            self.text.append(value)
+
+
 class CredentialReviewTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -103,7 +123,7 @@ class CredentialReviewTests(unittest.TestCase):
 
     def test_valid_limited_result_remains_overall_indeterminate_in_every_format(self):
         value = review.build_review(self.matched, "verify-witness")
-        self.assertEqual(value["format"], "evidect-credential-review/1")
+        self.assertEqual(value["format"], "evidect-credential-review/2")
         self.assert_headline(value, "VALID", "INDETERMINATE")
         self.assertEqual(value["inventory"]["expected_count"], 5)
         self.assertEqual(len(value["attempts"]), 5)
@@ -139,6 +159,8 @@ class CredentialReviewTests(unittest.TestCase):
         self.assert_headline(absent, "INDETERMINATE", "INDETERMINATE")
         self.assertEqual(absent["attempts"], [])
         self.assertIsNone(absent["inventory"])
+        for field in ("credential_checks", "receipt_checks", "provider_correlation"):
+            self.assertIsNone(absent[field])
         self.assertTrue(all(row["status"] != "VALID" for row in absent["layers"]))
         invalid = review.build_review(self.error_inner_invalid, "verify-witness")
         self.assert_headline(invalid, "INVALID", "INVALID")
@@ -179,7 +201,7 @@ class CredentialReviewTests(unittest.TestCase):
 
     def test_unknown_saved_formats_and_inconsistent_or_promoted_assurance_are_rejected(self):
         bad_format = copy.deepcopy(self.matched)
-        bad_format["format"] = "evidect-credential-review/1"
+        bad_format["format"] = "evidect-credential-review/2"
         promoted = copy.deepcopy(self.matched)
         promoted["overall_status"] = "VALID"
         conflicting = copy.deepcopy(self.rollback)
@@ -275,9 +297,9 @@ class CredentialReviewTests(unittest.TestCase):
             f.write_owned(paths[name], content)
         return lab, paths
 
-    def cli(self, lab, paths, output=None, *, extra=()):
+    def cli(self, lab, paths, output=None, *, extra=(), state=None):
         args = [sys.executable, "-I", "-B", str(HERE / "receive.py"), "verify-local",
-                "--state-dir", str(lab.store.directory), "--stream", lab.stream]
+                "--state-dir", str(lab.store.directory if state is None else state), "--stream", lab.stream]
         for name in ("package", "evidence", "credential-trust", "expectation"):
             args.extend(["--" + name, str(paths[name])])
         if output is not None:
@@ -320,6 +342,160 @@ class CredentialReviewTests(unittest.TestCase):
         self.assertEqual(invalid["overall_status"], "INVALID")
         self.assertEqual(rejected.stderr, b"Review export failed; the verification result is unchanged.\n")
         self.assertEqual({path.name: path.read_bytes() for path in directory.iterdir()}, before)
+
+    def test_cyclic_output_parent_preserves_all_three_cli_verdicts_and_static_error(self):
+        lab, paths = self.cli_fixture()
+        first, second = self.root / "loop-a", self.root / "loop-b"
+        first.symlink_to(second.name, target_is_directory=True)
+        second.symlink_to(first.name, target_is_directory=True)
+        output = first / "review"
+        before_db = lab.databases()
+        for expected, state in (("VALID", None), ("INDETERMINATE", self.root / "state-not-created"), ("INVALID", None)):
+            with self.subTest(status=expected):
+                if expected == "INVALID":
+                    changed = json.loads(paths["evidence"].read_bytes())
+                    changed["attempts"][0]["signed_inputs"]["request"]["signature"] = "0" * 128
+                    paths["evidence"].write_bytes(f.encode(changed))
+                before_files = {name: path.read_bytes() for name, path in paths.items()}
+                process, result = self.cli(lab, paths, output, state=state)
+                self.assertEqual(result["local_status"], expected)
+                self.assertEqual(result["overall_status"], "INVALID" if expected == "INVALID" else "INDETERMINATE")
+                self.assertEqual(process.returncode, 1 if expected == "INVALID" else 2)
+                self.assertEqual(process.stderr, b"Review export failed; the verification result is unchanged.\n")
+                if expected == "INVALID":
+                    self.assertEqual(result["receiver"]["credential"]["result"]["attempts"][0]["request_signature"]["status"], "INVALID")
+                self.assertEqual(lab.databases(), before_db)
+                self.assertEqual({name: path.read_bytes() for name, path in paths.items()}, before_files)
+        self.assertFalse((self.root / "state-not-created").exists())
+        self.assertTrue(first.is_symlink() and second.is_symlink())
+
+    def missing_state_result(self, name, **selection):
+        directory = self.root / name
+        directory.mkdir(mode=0o700)
+        lab = f.Lab(directory, self.inputs, self.receipt_key, self.witness_key)
+        delivery = lab.delivery(**selection)
+        paths = {}
+        for flag, raw in (("package", delivery["package"]), ("evidence", delivery["evidence"]),
+                          ("credential-trust", delivery["trust"]), ("expectation", delivery["expectation"])):
+            paths[flag] = directory / (flag + ".input")
+            f.write_owned(paths[flag], raw)
+        missing = directory / "state-not-created"
+        process, result = self.cli(lab, paths, state=missing)
+        self.assertEqual(result["format"], "evidect-credential-receiver-error/1")
+        self.assertEqual(process.returncode, 1 if result["local_status"] == "INVALID" else 2)
+        self.assertEqual(process.stderr, b"")
+        self.assertFalse(missing.exists())
+        return result, result["receiver"]["credential"]["result"]
+
+    def assert_diagnostic_text(self, projected, *tokens):
+        for rendered in (review.render_html(projected), review.render_markdown(projected)):
+            for token in tokens:
+                self.assertIn(token, rendered)
+
+    def inventory_text(self, projected):
+        parsed = SectionText("review-inventory")
+        parsed.feed(review.render_html(projected))
+        self.assertTrue(parsed.found)
+        return " ".join(parsed.text)
+
+    def test_inventory_equal_counts_retain_missing_and_unexpected_request_digests(self):
+        expectation = json.loads(self.inputs["expectation"])
+        replaced = expectation["requestDigests"][0]
+        replacement = next(char * 64 for char in "0123456789abcdef" if char * 64 not in expectation["requestDigests"])
+        expectation["requestDigests"][0] = replacement
+        source, offline = self.missing_state_result("inventory", expectation=f.encode(expectation))
+        self.assertEqual(offline["inventory"]["expected_count"], 5)
+        self.assertEqual(offline["inventory"]["supplied_unique_count"], 5)
+        self.assertEqual(offline["inventory"]["missing_request_digests"], [replacement])
+        self.assertEqual(offline["inventory"]["unexpected_request_digests"], [replaced])
+        projected = review.build_review(source, "verify-local")
+        self.assertEqual(projected["inventory"], {**offline["inventory"], "assessment": "COMPARED"})
+        self.assert_headline(projected, "INVALID", "INVALID")
+        self.assert_diagnostic_text(projected, replacement, replaced, "UNEXPECTED_SIGNED_REQUEST")
+
+    def test_uninspected_inventory_hides_uncalculated_zero_counts_and_empty_lists(self):
+        source, offline = self.missing_state_result("uninspected", evidence=b"{}")
+        self.assertEqual(offline["inventory"]["reason"], "INVENTORY_NOT_CHECKED")
+        self.assertEqual(offline["inventory"]["expected_count"], 0)
+        self.assertEqual(offline["inventory"]["supplied_unique_count"], 0)
+        projected = review.build_review(source, "verify-local")
+        self.assertEqual(projected["inventory"]["assessment"], "NOT_CHECKED")
+        for field in ("expected_count", "supplied_unique_count", "missing_request_digests", "unexpected_request_digests"):
+            self.assertIsNone(projected["inventory"][field])
+        self.assertIsNone(projected["provider_correlation"]["unattributed_provider_request_ids"])
+        text = self.inventory_text(projected)
+        self.assertIn("未計算", text)
+        self.assertNotRegex(text, r"(?<![0-9])0(?![0-9])")
+        self.assertNotIn("該当なし", text)
+        self.assert_diagnostic_text(projected, "MALFORMED_OR_UNSUPPORTED_EVIDENCE", "INVENTORY_NOT_CHECKED")
+        self.assert_headline(projected, "INVALID", "INVALID")
+
+    def test_missing_expected_inventory_keeps_observed_count_but_not_invented_expected_zero(self):
+        expectation = json.loads(self.inputs["expectation"])
+        expectation["requestDigests"] = None
+        source, offline = self.missing_state_result("expectation-missing", expectation=f.encode(expectation))
+        self.assertEqual(offline["inventory"]["reason"], "RECEIVER_EXPECTATION_UNAVAILABLE")
+        self.assertEqual(offline["inventory"]["supplied_unique_count"], 5)
+        projected = review.build_review(source, "verify-local")
+        self.assertEqual(projected["inventory"]["assessment"], "EXPECTATION_UNAVAILABLE")
+        self.assertEqual(projected["inventory"]["supplied_unique_count"], 5)
+        for field in ("expected_count", "missing_request_digests", "unexpected_request_digests"):
+            self.assertIsNone(projected["inventory"][field])
+        self.assertIn("未計算", self.inventory_text(projected))
+        self.assertNotIn("該当なし", self.inventory_text(projected))
+        self.assert_diagnostic_text(projected, "RECEIVER_EXPECTATION_UNAVAILABLE")
+        self.assert_headline(projected, "INDETERMINATE", "INDETERMINATE")
+
+    def test_actual_receipt_signature_failure_and_expiry_keep_distinct_diagnostics(self):
+        lab = f.Lab(self.root, self.inputs, self.receipt_key, self.witness_key)
+        original = lab.delivery(); lab.adopt_pair(original)
+        changed = json.loads(original["package"])
+        changed["signature"]["signature"] = "0" * 128
+        wrong_signature = lab.local({**original, "package": f.encode(changed)})
+        expired = lab.local(original, now=original["pin"]["expires_at"])
+        for source, expected, reason in ((wrong_signature, "INVALID", "SIGNATURE_OR_KEY_MISMATCH"),
+                                         (expired, "INDETERMINATE", "CHECKPOINT_EXPIRED")):
+            with self.subTest(reason=reason):
+                original_checks = source["receiver"]["handoff"]["authentication"]["checks"]
+                projected = review.build_review(source, "verify-local")
+                self.assertEqual(projected["receipt_checks"], original_checks)
+                self.assert_diagnostic_text(projected, reason)
+                self.assert_headline(projected, expected, "INVALID" if expected == "INVALID" else "INDETERMINATE")
+        self.assertEqual(next(check for check in review.build_review(expired, "verify-local")["receipt_checks"]
+                              if check["name"] == "signature")["status"], "VALID")
+
+    def test_context_and_trust_diagnostics_are_retained_from_original_verification(self):
+        expectation = json.loads(self.inputs["expectation"])
+        expectation["contextId"] = "ctx-different-receiver-selection"
+        trust = json.loads(self.inputs["trust"])
+        trust["issuerKeys"][0]["publicKeySpki"] = "invalid-key-encoding"
+        for name, selection, component, expected_reason in (
+            ("context-mismatch", {"expectation": f.encode(expectation)}, "context_binding", "EXPECTED_CONTEXT_MISMATCH"),
+            ("trust-unavailable", {"trust": f.encode(trust)}, "trust_material", "TRUST_INPUT_PARTIALLY_UNAVAILABLE"),
+        ):
+            with self.subTest(component=component):
+                source, offline = self.missing_state_result(name, **selection)
+                self.assertEqual(offline[component]["reason"], expected_reason)
+                projected = review.build_review(source, "verify-local")
+                self.assertEqual(projected["credential_checks"], [
+                    {"name": key, **offline[key]} for key in ("context_binding", "trust_material")])
+                self.assert_diagnostic_text(projected, expected_reason)
+                self.assertEqual(projected["overall_status"], source["overall_status"])
+
+    def test_global_unattributed_provider_record_survives_individually_matching_attempts(self):
+        evidence = json.loads(self.inputs["evidence"])
+        records = evidence["provider_observation"]["records"]
+        records.append({**records[0], "attempt": records[-1]["attempt"] + 1,
+                        "providerRequestId": "synthetic-unattributed-request", "dispatchId": None, "requestDigest": None})
+        source, offline = self.missing_state_result("unattributed", evidence=f.encode(evidence))
+        self.assertEqual(len(offline["attempts"]), 5)
+        self.assertTrue(all(attempt["status"] == "VALID" for attempt in offline["attempts"]))
+        self.assertEqual(offline["provider_correlation"]["reason"], "UNATTRIBUTED_PROVIDER_RECORDS")
+        projected = review.build_review(source, "verify-local")
+        self.assertEqual(projected["provider_correlation"], {"status": "INDETERMINATE", "reason": "UNATTRIBUTED_PROVIDER_RECORDS",
+                         "unattributed_provider_request_ids": ["synthetic-unattributed-request"]})
+        self.assert_diagnostic_text(projected, "UNATTRIBUTED_PROVIDER_RECORDS", "synthetic-unattributed-request")
+        self.assert_headline(projected, "INDETERMINATE", "INDETERMINATE")
 
     def test_saved_verification_report_is_not_accepted_as_original_evidence_or_cli_trust(self):
         lab, paths = self.cli_fixture()
