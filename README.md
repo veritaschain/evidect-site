@@ -58,6 +58,21 @@ node --test examples/execution-authorization/gate.test.mjs
 node examples/execution-authorization/demo.mjs
 ```
 
+### Credential lifecycle and monitoring gaps
+
+The [credential lifecycle experiment](examples/execution-authorization/credential-lifecycle/README.md)
+reuses the same gate to bind synthetic credential operations to requests and approvals, check collector
+receipts and fresh challenges, and distinguish gate markers from mock-provider attempts and effects.
+It includes parent revocation with surviving derived sessions, direct provider use outside the gate,
+lost acknowledgements, and observation gaps. Real Ed25519 checks are used, while all authority and
+provider state remain within one trusted local controller. Reports are unsigned, witness integration
+and production identity are not established, and controls and legal compliance remain NOT_ASSESSED.
+
+```sh
+node --test examples/execution-authorization/credential-lifecycle/lifecycle.test.mjs
+node examples/execution-authorization/credential-lifecycle/demo.mjs
+```
+
 ### Measured context and separately observed effects
 
 The [runtime boundary experiment](examples/runtime-boundaries/README.md) adds a separate signed approval over a selected synthetic file's digest, a fixed local destination and an observer process identity. It remeasures that context before dispatch and compares authorization with journal contents read by a separate child process. Eight cases cover changes after approval, a deliberately injected effect after denial, and observer replacement or stoppage. Missing observations remain indeterminate; a passing test means the expected case behavior occurred. The controller and host remain trusted, and the experiment is not runtime attestation, independent assessment or a reconstruction of the motivating incidents.
