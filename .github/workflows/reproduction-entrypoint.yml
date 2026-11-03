@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'methodology/**'
+      - 'notices/**'
       - 'support/**'
       - 'assets/css/**'
       - 'assets/js/**'
@@ -17,6 +18,7 @@ on:
     branches: [main]
     paths:
       - 'methodology/**'
+      - 'notices/**'
       - 'support/**'
       - 'assets/css/**'
       - 'assets/js/**'
