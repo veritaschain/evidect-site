@@ -20,6 +20,7 @@
   let started = false;
   let panel;
   let settings;
+  let consentChannel;
   window['ga-disable-' + ID] = choice !== 'granted';
 
   function readChoice() {
@@ -47,6 +48,7 @@
   function gtag() { window.dataLayer.push(arguments); }
 
   function start() {
+    syncConsent();
     if (started || choice !== 'granted' || !production || !measurePage) return;
     started = true;
     window['ga-disable-' + ID] = false;
@@ -80,6 +82,22 @@
     });
   }
 
+  // A different page can withdraw consent while this document is still open.
+  // Notifications only prompt a cookie check; they never authorize analytics.
+  function syncConsent() {
+    if (choice !== 'granted') return;
+    const current = readChoice();
+    if (current === 'granted') return;
+    choice = current;
+    window['ga-disable-' + ID] = true;
+    if (started) gtag('consent', 'update', {analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied'});
+    clearCookies();
+    if (panel) {
+      panel.hidden = Boolean(choice);
+      settings.hidden = !choice;
+    }
+  }
+
   function choose(value) {
     choice = value;
     document.cookie = CONSENT + '=' + value + '; Max-Age=15552000; Path=/; SameSite=Lax' +
@@ -92,6 +110,8 @@
       window['ga-disable-' + ID] = true;
       if (started) gtag('consent', 'update', {analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied'});
       clearCookies();
+      try { if (consentChannel) consentChannel.postMessage('consent-changed'); }
+      catch (_) { /* Lifecycle and click checks still reconcile consent. */ }
     }
     panel.hidden = true;
     settings.hidden = false;
@@ -121,8 +141,18 @@
     settings.type = 'button'; settings.textContent = copy.settings; settings.hidden = !choice;
     settings.addEventListener('click', () => { panel.hidden = false; settings.hidden = true; no.focus(); });
     document.body.append(panel, settings);
+    window.addEventListener('focus', syncConsent);
+    window.addEventListener('pageshow', syncConsent);
+    document.addEventListener('visibilitychange', syncConsent);
+    try {
+      if (typeof BroadcastChannel === 'function') {
+        consentChannel = new BroadcastChannel('evidect-analytics-consent');
+        consentChannel.addEventListener('message', syncConsent);
+      }
+    } catch (_) { /* Some environments do not permit cross-tab channels. */ }
     // Do not turn a click, an attempted submission or a thank-you page view into a lead.
     document.addEventListener('click', event => {
+      syncConsent();
       if (choice !== 'granted' || !started || window['ga-disable-' + ID]) return;
       const link = event.target.closest && event.target.closest('a[href]');
       if (!link) return;

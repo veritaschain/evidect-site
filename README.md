@@ -91,6 +91,6 @@ The [Japanese operator guide](examples/retention-evidence-intake/OPERATOR_GUIDE.
 
 ## Website publication correction — 2 November 2026
 
-Homepage analytics now require opt-in; the privacy page provides settings without collecting a page view. The privacy notice identifies jsDelivr, and the methodology page states the permitted public-observation boundary. Internal DNS and approval notes and the SEO strategy memo are removed from the current tree. These changes do not establish past message compliance or implement a mail-suppression backend.
+Homepage analytics now require opt-in; the privacy page provides settings without collecting a page view. Advertising consent remains denied, and the analytics configuration strips non-campaign query data and fragments from page URLs and all query data and fragments from referrers. The privacy notice identifies jsDelivr, and the support page links to official PHP information. Internal DNS and approval notes and the SEO strategy memo are removed from the current tree. This website change does not update mail-delivery or suppression systems or add payment, cancellation or refund terms.
 
-トップページのアクセス解析を同意後に限定し、プライバシーページに設定変更機能とjsDelivrの記載を追加しました。公開情報の観測範囲を明記し、内部向けのDNS・承認記録・SEO戦略メモを現行ツリーから外しました。過去メールの法令適合や送付停止処理の実装を示すものではありません。
+トップページのアクセス解析を同意後に限定し、プライバシーページに設定変更機能とjsDelivrの記載を追加しました。広告用の同意は拒否のままとし、解析設定に渡すページURLでは許可したキャンペーン値以外のクエリとフラグメントを除去し、参照元URLではすべてのクエリとフラグメントを除去します。サポートページの参照先をPHP公式情報に置き換え、内部向けのDNS・承認記録・SEO戦略メモを現行ツリーから外しました。メール送付・停止システムの変更や、支払・キャンセル・返金条件の追加は行っていません。

@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('assets/js/analytics.js', 'utf8');
 
-function boot({cookie = '', url = 'https://evidect.veritaschain.org/', lang = 'ja', referrer = ''} = {}) {
-  const jar = new Map(cookie.split(';').filter(Boolean).map(x => x.trim().split('=')));
+function boot({cookie = '', url = 'https://evidect.veritaschain.org/', lang = 'ja', referrer = '', html, sharedJar, BroadcastChannel} = {}) {
+  const jar = sharedJar || new Map(cookie.split(';').filter(Boolean).map(x => x.trim().split('=')));
   class Element {
     constructor(tag) { this.tag = tag; this.children = []; this.events = {}; this.hidden = false; }
     append(...nodes) { this.children.push(...nodes); }
@@ -23,16 +23,60 @@ function boot({cookie = '', url = 'https://evidect.veritaschain.org/', lang = 'j
       if (/Max-Age=0(?:;|$)/.test(value)) jar.delete(pair.slice(0,i));
       else jar.set(pair.slice(0,i),pair.slice(i+1)); }
   });
-  const context = vm.createContext({document:doc, location:new URL(url), URL, Date});
+  const windowEvents = {};
+  const context = vm.createContext({document:doc, location:new URL(url), URL, Date, BroadcastChannel,
+    addEventListener(name, handler) { (windowEvents[name] ||= []).push(handler); }});
   context.window = context;
-  vm.runInContext(source, context);
+  if (html === undefined) {
+    vm.runInContext(source, context);
+  } else {
+    // Execute the document's inline bootstrap before its deferred analytics file.
+    // Other local UI bundles are outside this analytics integration harness.
+    const deferred = [];
+    for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+      if (/\btype\s*=\s*["']application\/ld\+json["']/i.test(attrs)) continue;
+      const src = attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+      if (!src) {
+        vm.runInContext(body, context);
+      } else {
+        const scriptURL = new URL(src, url);
+        if (scriptURL.hostname === 'www.googletagmanager.com') {
+          const tag = doc.createElement('script'); tag.src = scriptURL.href;
+          doc.head.appendChild(tag); // Record a direct tag as an immediate network attempt.
+        } else if (scriptURL.origin === new URL(url).origin && scriptURL.pathname === '/assets/js/analytics.js') {
+          assert.match(attrs, /\bdefer\b/i, 'the consent bootstrap must remain deferred');
+          deferred.push(() => vm.runInContext(source, context));
+        }
+      }
+    }
+    assert.equal(deferred.length, 1, 'the real page must load one local consent bootstrap');
+    deferred.forEach(run => run());
+  }
   const find = id => [...doc.body.children, ...doc.body.children.flatMap(x=>x.children)].find(x=>x.id===id);
   const panel = find('evidect-analytics-panel');
   const buttons = panel.children.find(x => x.className === 'evidect-consent-actions').children;
   const calls = () => (context.dataLayer || []).map(x=>Array.from(x));
   const tags = () => doc.head.children.filter(x => x.tag==='script');
   return {doc, context, panel, accept:()=>buttons[1].click(), decline:()=>buttons[0].click(), settings:find('evidect-cookie-settings'), calls, tags,
-    config:()=>calls().find(x=>x[0]==='config')?.[2], repeat:()=>vm.runInContext(source,context)};
+    config:()=>calls().find(x=>x[0]==='config')?.[2], repeat:()=>vm.runInContext(source,context),
+    windowEvent:name=>(windowEvents[name] || []).forEach(handler=>handler())};
+}
+
+function createBroadcastChannel() {
+  const peers = new Map();
+  return class BroadcastChannel {
+    constructor(name) {
+      this.name = name; this.listeners = [];
+      if (!peers.has(name)) peers.set(name, []);
+      peers.get(name).push(this);
+    }
+    addEventListener(type, handler) { if (type === 'message') this.listeners.push(handler); }
+    postMessage(data) {
+      for (const peer of peers.get(this.name)) {
+        if (peer !== this) peer.listeners.forEach(handler=>handler({data}));
+      }
+    }
+  };
 }
 
 test('no Google tag or event is emitted before analytics consent',()=>{
@@ -101,4 +145,108 @@ test('privacy and notice pages never expand homepage analytics even with stored 
     const b=boot({url:'https://evidect.veritaschain.org'+path,cookie:'evidect_analytics_consent_v1=granted'});
     assert.equal(b.tags().length,0);b.accept();assert.equal(b.tags().length,0);
   }
+});
+
+const homepageHTML = fs.readFileSync('index.html', 'utf8');
+const privacyHTML = fs.readFileSync('privacy/index.html', 'utf8');
+
+function assertHomepageConsentContract(html) {
+  const b = boot({html, url:'https://evidect.veritaschain.org/?email=synthetic%40example.invalid&token=synthetic&utm_source=review#synthetic'});
+  assert.equal(b.tags().length, 0, 'no Google script before consent');
+  assert.equal(b.calls().length, 0, 'no legacy measurement commands before consent');
+  b.accept();
+  const calls = b.calls();
+  assert.equal(b.tags().length, 1);
+  assert.equal(calls.filter(c => c[0] === 'config').length, 1, 'exactly one privacy-configured page view');
+  assert(calls.findIndex(c => c[0] === 'consent' && c[1] === 'default') < calls.findIndex(c => c[0] === 'config'));
+  assert.equal(b.config().page_location, 'https://evidect.veritaschain.org/?utm_source=review');
+  assert.equal(b.config().allow_google_signals, false);
+  assert.equal(b.config().allow_ad_personalization_signals, false);
+  for (const c of calls.filter(c => c[0] === 'consent')) {
+    for (const key of ['ad_storage', 'ad_user_data', 'ad_personalization']) assert.equal(c[2][key], 'denied');
+  }
+}
+
+test('actual homepage HTML queues only the consent-controlled analytics configuration',()=>{
+  assertHomepageConsentContract(homepageHTML);
+});
+test('actual privacy HTML exposes settings without starting analytics after saved or new consent',()=>{
+  for (const cookie of ['', 'evidect_analytics_consent_v1=granted']) {
+    const b = boot({html:privacyHTML, url:'https://evidect.veritaschain.org/privacy/', cookie});
+    assert.equal(b.tags().length, 0); assert.equal(b.calls().length, 0);
+    b.accept(); assert.equal(b.tags().length, 0); assert.equal(b.calls().length, 0);
+  }
+});
+test('HTML integration detects the legacy inline bootstrap even beside a deferred consent loader',()=>{
+  const legacy = "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-XTK1LJKRGV');</script>";
+  assert.throws(() => assertHomepageConsentContract(homepageHTML.replace('</head>', legacy + '</head>')),
+    /no legacy measurement commands before consent/);
+});
+test('HTML integration detects a direct Google tag that bypasses the consent loader',()=>{
+  const direct = '<script async src="https://www.googletagmanager.com/gtag/js?id=G-XTK1LJKRGV"></script>';
+  assert.throws(() => assertHomepageConsentContract(homepageHTML.replace('</head>', direct + '</head>')),
+    /no Google script before consent/);
+});
+
+test('withdrawal on the real privacy page immediately disables an already open homepage',()=>{
+  const sharedJar = new Map([['evidect_analytics_consent_v1', 'granted']]);
+  const BroadcastChannel = createBroadcastChannel();
+  const home = boot({html:homepageHTML, sharedJar, BroadcastChannel});
+  const privacy = boot({html:privacyHTML, url:'https://evidect.veritaschain.org/privacy/', sharedJar, BroadcastChannel});
+  assert.equal(home.tags().length, 1);
+  privacy.decline();
+  assert.equal(home.context['ga-disable-G-XTK1LJKRGV'], true);
+  assert.equal(home.calls().filter(c=>c[0]==='consent').at(-1)[2].analytics_storage, 'denied');
+  home.doc.events.click({target:{closest:()=>({getAttribute:()=> 'mailto:synthetic@example.invalid'})}});
+  assert.equal(home.calls().filter(c=>c[0]==='event').length, 0);
+  assert.equal(privacy.tags().length, 0);
+  assert.equal(home.panel.hidden, true);
+  assert.equal(home.settings.hidden, false);
+});
+
+test('focus, history restore and visibility changes reconcile withdrawn or expired consent without a channel',()=>{
+  for (const trigger of ['focus', 'pageshow', 'visibilitychange']) {
+    for (const stored of ['', 'denied']) {
+      const b = boot({cookie:'evidect_analytics_consent_v1=granted'});
+      b.doc.cookie = 'evidect_analytics_consent_v1=' + stored + (stored ? '' : '; Max-Age=0');
+      if (trigger === 'visibilitychange') b.doc.events.visibilitychange?.();
+      else b.windowEvent(trigger);
+      assert.equal(b.context['ga-disable-G-XTK1LJKRGV'], true, trigger + ' / ' + stored);
+      assert.equal(b.panel.hidden, Boolean(stored));
+    }
+  }
+});
+
+test('a custom event rechecks current consent before recording a click',()=>{
+  const b = boot({cookie:'evidect_analytics_consent_v1=granted'});
+  b.doc.cookie = 'evidect_analytics_consent_v1=; Max-Age=0';
+  b.doc.events.click({target:{closest:()=>({getAttribute:()=> 'https://github.com/veritaschain/vap-spec'})}});
+  assert.equal(b.context['ga-disable-G-XTK1LJKRGV'], true);
+  assert.equal(b.calls().filter(c=>c[0]==='event').length, 0);
+});
+
+test('channel messages never grant consent and only revoke after checking the current cookie',()=>{
+  const BroadcastChannel = createBroadcastChannel();
+  const b = boot({cookie:'evidect_analytics_consent_v1=granted', BroadcastChannel});
+  const sender = new BroadcastChannel('evidect-analytics-consent');
+  sender.postMessage('denied');
+  assert.equal(b.context['ga-disable-G-XTK1LJKRGV'], false);
+  b.doc.cookie = 'evidect_analytics_consent_v1=denied';
+  sender.postMessage('granted');
+  assert.equal(b.context['ga-disable-G-XTK1LJKRGV'], true);
+  const denied = boot({cookie:'evidect_analytics_consent_v1=denied', BroadcastChannel});
+  denied.doc.cookie = 'evidect_analytics_consent_v1=granted';
+  sender.postMessage('granted');
+  assert.equal(denied.tags().length, 0);
+});
+
+test('an unavailable cross-tab channel leaves consent controls and lifecycle checks usable',()=>{
+  class UnavailableChannel { constructor() { throw new Error('Channel unavailable'); } }
+  const b = boot({BroadcastChannel:UnavailableChannel});
+  b.accept();
+  assert.equal(b.tags().length, 1);
+  b.doc.cookie = 'evidect_analytics_consent_v1=denied';
+  b.windowEvent('focus');
+  assert.equal(b.context['ga-disable-G-XTK1LJKRGV'], true);
+  assert.doesNotThrow(()=>b.decline());
 });
