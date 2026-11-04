@@ -18,6 +18,7 @@ MAX_DB_BYTES = 8 * 1024 * 1024
 LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/+-]{0,127}\Z")
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 LABELS = ("service", "environment", "release", "scope", "policy_revision")
+KINDS = ("runtime", "routing", "credential")
 SCHEMA = (
     "CREATE TABLE meta (id INTEGER PRIMARY KEY CHECK(id=1), store_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0))",
     "CREATE TABLE streams (stream TEXT PRIMARY KEY, kind TEXT NOT NULL, generation INTEGER NOT NULL, lineage TEXT NOT NULL, checkpoint TEXT NOT NULL, digest TEXT NOT NULL, public_key TEXT NOT NULL)",
@@ -67,7 +68,7 @@ def checkpoint(value):
 
 
 def identity(stream, kind):
-    if type(stream) is not str or not LABEL.fullmatch(stream) or kind not in ("runtime", "routing"):
+    if type(stream) is not str or not LABEL.fullmatch(stream) or kind not in KINDS:
         raise StateError("STREAM_IDENTITY_INVALID")
 
 
@@ -88,6 +89,8 @@ class Store:
     attackers, backups restored over the whole store, and filesystem rollback
     are outside this experiment's boundary. Missing state is never recreated.
     """
+    error_type = StateError
+
     def __init__(self, directory):
         self.directory = Path(directory).absolute()
         self.path = self.directory / DB_NAME
@@ -144,7 +147,7 @@ class Store:
             yield db
         except StateError:
             raise
-        except (OSError, sqlite3.Error, ValueError, TypeError, IndexError):
+        except (OSError, sqlite3.Error, ValueError, TypeError, IndexError, RecursionError):
             raise StateError("STATE_UNAVAILABLE") from None
         finally:
             if db is not None:
@@ -216,8 +219,10 @@ class Store:
             db.commit()
             return result
 
-    def select(self, stream, kind):
+    def select(self, stream, kind, *, checked_fingerprint=None):
         identity(stream, kind)
+        if checked_fingerprint is not None and not fingerprint(checked_fingerprint):
+            raise StateError("KEY_FINGERPRINT_INVALID")
         with self._connection(write=False) as db:
             db.execute("BEGIN")
             meta = self._meta(db)
@@ -231,5 +236,11 @@ class Store:
             if row[1] != pin["context"]["generation"] or row[2] != lineage or row[4] != digest(pin):
                 raise StateError("STATE_CORRUPT")
             revoked = db.execute("SELECT 1 FROM revoked WHERE fingerprint=?", (pin["key_fingerprint"],)).fetchone() is not None
-            return {**meta, "kind": kind, "generation": row[1], "checkpoint": pin,
-                    "checkpoint_sha256": row[4], "public_key": row[5], "revoked": revoked}
+            selected = {**meta, "kind": kind, "generation": row[1], "checkpoint": pin,
+                        "checkpoint_sha256": row[4], "public_key": row[5], "revoked": revoked}
+            if checked_fingerprint is not None:
+                # Check the key used by an in-flight verifier even if another
+                # key has since been adopted. Both reads share this snapshot.
+                selected["checked_key_revoked"] = db.execute("SELECT 1 FROM revoked WHERE fingerprint=?",
+                                                             (checked_fingerprint,)).fetchone() is not None
+            return selected
