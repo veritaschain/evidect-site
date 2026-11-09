@@ -1,6 +1,7 @@
 """Independent receiver checks using real runtime output and signed legacy receipts."""
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import importlib.util
@@ -478,6 +479,32 @@ class RuntimeHandoffTests(unittest.TestCase):
         value = copy.deepcopy(self.runtime_value)
         value["cases"][0]["independent_assessment"] = True
         self.assertEqual(self.verify(self.make_delivery(encode(value)))["runtime"]["status"], "INVALID_INPUT")
+
+    def test_invalid_receipt_numbers_are_input_errors_not_verifier_unavailability(self):
+        paths = self.receive_files()
+        original = encode(self.delivery["receipt"])
+        field = b'"collection": "LOCAL_FILES_ONLY"'
+        self.assertIn(field, original)
+        cases = (("overflow", b"1e999"), ("negative_overflow", b"-1e999"), ("nan", b"NaN"),
+                 ("finite_fraction", b"1.25"), ("finite_exponent", b"1e2"), ("huge_integer", b"9" * 4301))
+        for name, token in cases:
+            with self.subTest(case=name):
+                receipt = original.replace(field, b'"collection": ' + token, 1)
+                package = json.loads(self.delivery["package"])
+                package["receipt_base64"] = base64.b64encode(receipt).decode("ascii")
+                raw = encode(package)
+                self.assertLess(len(receipt), legacy.MAX_RECEIPT_BYTES)
+                self.assertLess(len(raw), legacy.MAX_PACKAGE_BYTES)
+                paths["package"].write_bytes(raw)
+                before = {path: path.read_bytes() for path in paths.values()}
+                with self.assertRaises(adapter.RuntimeHandoffError) as raised:
+                    self.verify({**self.delivery, "package": raw})
+                self.assertEqual((raised.exception.code, raised.exception.exit_code), ("INVALID_HANDOFF_INPUT", 1))
+                result = self.cli(*self.cli_args(paths))
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(result.stderr, "Runtime handoff rejected: INVALID_HANDOFF_INPUT\n")
+                self.assertEqual({path: path.read_bytes() for path in paths.values()}, before)
 
     def test_original_json_boundary_rejects_duplicate_keys_and_invalid_encoding(self):
         duplicate = self.runtime_bytes.replace(b'"format":', b'"format":"untrusted","format":', 1)

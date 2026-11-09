@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import unittest
@@ -74,6 +75,28 @@ class WitnessIntegrationTests(unittest.TestCase):
                 self.assertEqual(before, [s.path.read_bytes() for s in (self.store, self.witness_store)])
                 self.assertNotIn(b"PRIVATE KEY", self.witness_store.path.read_bytes())
 
+    def test_nonfinite_witness_response_is_invalid_without_changing_either_store(self):
+        for kind in self.adapters:
+            data = self.setup_pair(kind)
+            self.assertEqual(self.verify(kind, data)["local_status"], "VALID")
+            before = [store.path.read_bytes() for store in (self.store, self.witness_store)]
+            for token in (b"1e999", b"-1e999", b"NaN"):
+                with self.subTest(kind=kind, number=token):
+                    def exchange(query):
+                        response = json.loads(self.transport()(query))
+                        response["payload"]["nonce"] = "__witness_test_number__"
+                        return w.encode(response).replace(w.encode("__witness_test_number__"), token)
+                    result = self.verify(kind, data, exchange=exchange)
+                    self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                                     ("INVALID", "INVALID", "INVALID"))
+                    self.assertEqual(result["witness_reason"], "WITNESS_NUMBER_INVALID")
+                    self.assertEqual(result["receiver"]["local_status"], "VALID")
+                    self.assertEqual(result["receiver"]["receiver"][kind]["status"], "RECOMPUTED")
+                    self.assertIsNotNone(result["query_sha256"])
+                    self.assertIsNone(result["signed_witness_response"])
+                    json.dumps(result, allow_nan=False)
+                    self.assertEqual(before, [store.path.read_bytes() for store in (self.store, self.witness_store)])
+
     def test_restored_receiver_database_rejected_by_current_witness_both_kinds(self):
         for kind in self.adapters:
             with self.subTest(kind=kind):
@@ -115,6 +138,122 @@ class WitnessIntegrationTests(unittest.TestCase):
         self.assertEqual((result["local_status"], result["witness_reason"]), ("INDETERMINATE", "WITNESS_BEHIND_RECEIVER"))
         self.adopt_to(self.witness_store, "runtime", new)
         self.assertEqual(self.verify("runtime", new)["local_status"], "VALID")
+
+    def test_lagging_signed_witness_retains_same_key_revocation_for_newer_receiver(self):
+        for kind in self.adapters:
+            for revoked, rotated in ((False, False), (True, False), (True, True)):
+                with self.subTest(kind=kind, revoked=revoked, rotated=rotated):
+                    suffix = kind + "-lag-" + str(revoked) + "-" + str(rotated)
+                    self.store = base.Store.create(self.base / (suffix + "-receiver"))
+                    self.witness_store = base.Store.create(self.base / (suffix + "-witness"))
+                    first = self.setup_pair(kind)
+                    newer = self.delivery(kind, 2, 1 if rotated else 0)
+                    self.adopt_to(self.store, kind, newer)
+                    if revoked:
+                        self.witness_store.revoke(first["pin"]["key_fingerprint"])
+                    before = [store.path.read_bytes() for store in (self.store, self.witness_store)]
+                    result = w.verify(self.store, self.adapters[kind], kind, kind, newer["package"], newer["report"],
+                                      self.selected_trust(kind), self.transport(), clock=lambda: self.now)
+                    invalid = revoked and not rotated
+                    expected = "INVALID" if invalid else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["witness_reason"], "WITNESS_SIGNER_REVOKED" if invalid else "WITNESS_BEHIND_RECEIVER")
+                    self.assertEqual((result["receiver"]["local_status"], result["receiver"]["generation"]), ("VALID", 2))
+                    remote = result["signed_witness_response"]["payload"]["snapshot"]
+                    self.assertEqual(remote["generation"], 1)
+                    self.assertIs(remote["revoked"], revoked)
+                    self.assertEqual(remote["signer_fingerprint"], first["pin"]["key_fingerprint"])
+                    self.assertEqual(remote["signer_fingerprint"] == newer["pin"]["key_fingerprint"], not rotated)
+                    self.assertEqual([store.path.read_bytes() for store in (self.store, self.witness_store)], before)
+
+    def test_first_witness_read_checks_the_signer_used_before_receiver_rotation(self):
+        for kind in self.adapters:
+            for revoke, rotate in ((True, False), (True, True), (False, True)):
+                with self.subTest(kind=kind, revoke=revoke, rotate=rotate):
+                    suffix = kind + "-boundary-" + str(revoke) + "-" + str(rotate)
+                    self.store = base.Store.create(self.base / (suffix + "-receiver"))
+                    self.witness_store = base.Store.create(self.base / (suffix + "-witness"))
+                    first = self.setup_pair(kind)
+                    rotated = self.delivery(kind, 2, 1) if rotate else None
+                    selected_trust = self.selected_trust(kind)
+                    samples, exchanges, after_actions = [], [], []
+                    def clock():
+                        samples.append(1)
+                        # The base verifier has completed its final state read.
+                        if len(samples) == 2:
+                            if revoke:
+                                self.store.revoke(first["pin"]["key_fingerprint"])
+                            if rotate:
+                                self.adopt_to(self.store, kind, rotated)
+                            after_actions.append([store.path.read_bytes() for store in (self.store, self.witness_store)])
+                        return self.now
+                    result = w.verify(self.store, self.adapters[kind], kind, kind, first["package"], first["report"],
+                                      selected_trust, lambda query: exchanges.append(query), clock=clock)
+                    expected = "INVALID" if revoke else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["witness_reason"], "RECEIVER_SIGNER_REVOKED" if revoke else "RECEIVER_STATE_CHANGED")
+                    self.assertEqual((result["receiver"]["local_status"], result["receiver"]["generation"]), ("VALID", 1))
+                    self.assertIsNone(result["query_sha256"])
+                    self.assertIsNone(result["signed_witness_response"])
+                    self.assertEqual(exchanges, [])
+                    self.assertEqual(len(samples), 2)
+                    current = self.store.select(kind, kind, checked_fingerprint=first["pin"]["key_fingerprint"])
+                    self.assertEqual(current["generation"], 2 if rotate else 1)
+                    self.assertIs(current["revoked"], revoke and not rotate)
+                    self.assertIs(current["checked_key_revoked"], revoke)
+                    self.assertEqual([store.path.read_bytes() for store in (self.store, self.witness_store)], after_actions[0])
+
+    def test_local_state_read_classification_at_each_witness_boundary(self):
+        # The fixture and witness load receiver.py independently. Classification
+        # follows this Store's declared error type, not Python module identity.
+        self.assertIsNot(base.StateError, w.load_receiver().StateError)
+        for kind in self.adapters:
+            for stage in ("post-base", "post-response", "final-clock"):
+                for unavailable in (False, True):
+                    with self.subTest(kind=kind, stage=stage, unavailable=unavailable):
+                        suffix = kind + "-read-" + stage + "-" + str(unavailable)
+                        self.store = base.Store.create(self.base / (suffix + "-receiver"))
+                        self.witness_store = base.Store.create(self.base / (suffix + "-witness"))
+                        delivery = self.setup_pair(kind)
+                        selected_trust = self.selected_trust(kind)
+                        saved = self.store.directory / "unavailable.sqlite3"
+                        samples, after_failure = [], []
+                        def fail_state():
+                            if unavailable:
+                                self.store.path.rename(saved)
+                            else:
+                                with sqlite3.connect(self.store.path) as db:
+                                    db.execute("UPDATE streams SET kind=?", ("routing" if kind == "runtime" else "runtime",))
+                            after_failure.append([(saved if unavailable else self.store.path).read_bytes(),
+                                                  self.witness_store.path.read_bytes()])
+                        def clock():
+                            samples.append(1)
+                            if ((stage == "post-base" and len(samples) == 2) or
+                                    (stage == "final-clock" and len(samples) == 3)):
+                                fail_state()
+                            return self.now
+                        def exchange(query):
+                            response = self.transport()(query)
+                            if stage == "post-response":
+                                fail_state()
+                            return response
+                        result = w.verify(self.store, self.adapters[kind], kind, kind, delivery["package"], delivery["report"],
+                                          selected_trust, exchange, clock=clock)
+                        expected = "INDETERMINATE" if unavailable else "INVALID"
+                        self.assertEqual((result["local_status"], result["witness_status"]), (expected, expected))
+                        self.assertEqual(result["witness_reason"], "WITNESS_OR_STATE_UNAVAILABLE" if unavailable
+                                         else "RECEIVER_STATE_INVALID")
+                        self.assertEqual(result["receiver"]["local_status"], "VALID")
+                        self.assertEqual(result["signed_witness_response"] is None, stage == "post-base")
+                        self.assertEqual(result["query_sha256"] is None, stage == "post-base")
+                        with self.assertRaises(base.StateError) as caught:
+                            self.store.select(kind, kind)
+                        self.assertEqual((caught.exception.code, caught.exception.exit_code),
+                            ("STATE_UNAVAILABLE", 2) if unavailable else ("STREAM_SCOPE_MISMATCH", 1))
+                        self.assertEqual([(saved if unavailable else self.store.path).read_bytes(),
+                                          self.witness_store.path.read_bytes()], after_failure[0])
+                        if unavailable:
+                            self.assertFalse(self.store.path.exists())
 
     def test_same_generation_different_signed_checkpoint_is_conflict(self):
         first, different = self.delivery("runtime"), self.delivery("runtime")

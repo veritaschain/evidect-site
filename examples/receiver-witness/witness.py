@@ -23,6 +23,7 @@ QUERY = "evidect-witness-query/1"
 RESPONSE = "evidect-witness-response/1"
 TRUST = "evidect-witness-trust/1"
 FORMAT = "evidect-witness-receiver/1"
+KINDS = ("runtime", "routing", "credential")
 _base = None
 
 
@@ -62,8 +63,14 @@ def parse(raw):
         return result
     def constant(_):
         raise WitnessError("WITNESS_NUMBER_INVALID", "INVALID")
+    def finite_float(text):
+        value = float(text)
+        if not math.isfinite(value):
+            raise WitnessError("WITNESS_NUMBER_INVALID", "INVALID")
+        return value
     try:
-        return json.loads(raw.decode("utf-8", "strict"), object_pairs_hook=pairs, parse_constant=constant)
+        return json.loads(raw.decode("utf-8", "strict"), object_pairs_hook=pairs,
+                          parse_constant=constant, parse_float=finite_float)
     except (UnicodeError, ValueError, RecursionError) as error:
         if isinstance(error, WitnessError):
             raise
@@ -86,14 +93,16 @@ def integer(value, minimum=0):
 def query(raw):
     value = parse(raw)
     exact(value, ("format", "nonce", "stream", "kind", "package_sha256", "report_sha256"))
-    if value["format"] != QUERY or value["kind"] not in ("runtime", "routing") or not matches(LABEL, value["stream"]) or not all(
+    if value["format"] != QUERY or value["kind"] not in KINDS or not matches(LABEL, value["stream"]) or not all(
             matches(HEX, value[key]) for key in ("nonce", "package_sha256", "report_sha256")):
         raise WitnessError("WITNESS_QUERY_INVALID", "INVALID")
     return value
 
 
 def trust(value):
-    exact(value, ("format", "witness_id", "store_id", "public_key", "max_round_trip_ms"))
+    # Selected configuration is a prerequisite, not evidence of a contradiction.
+    if type(value) is not dict or set(value) != {"format", "witness_id", "store_id", "public_key", "max_round_trip_ms"}:
+        raise WitnessError("WITNESS_TRUST_INVALID")
     if value["format"] != TRUST or not matches(LABEL, value["witness_id"]) or not matches(STORE_ID, value["store_id"]) or not (
             type(value["public_key"]) is str and 0 < len(value["public_key"]) <= 8192 and
             "PRIVATE KEY" not in value["public_key"] and integer(value["max_round_trip_ms"], 1) and
@@ -128,6 +137,10 @@ def crypto(operation, payload, key, signature=None):
 
 def snapshot(store, stream, kind):
     selected = store.select(stream, kind)
+    return _snapshot(selected)
+
+
+def _snapshot(selected):
     # Store.select checks the checkpoint shape and stored commitment internally.
     value = {"store_id": selected["store_id"], "revision": selected["revision"], "kind": selected["kind"],
              "generation": selected["generation"], "checkpoint_sha256": selected["checkpoint_sha256"],
@@ -136,10 +149,62 @@ def snapshot(store, stream, kind):
     return value
 
 
+def _select_receiver(store, stream, kind, *, checked_fingerprint=None):
+    # Only an error from this local read carries the receiver store's verdict.
+    # An exception supplied by transport is not an authenticated state claim.
+    try:
+        return store.select(stream, kind, checked_fingerprint=checked_fingerprint)
+    except ValueError as error:
+        # A Store loaded under another module name owns a distinct Python error
+        # class. Use its explicit contract, not a class name or arbitrary code.
+        if type(error) is not getattr(type(store), "error_type", None):
+            raise
+        if type(error.exit_code) is int and error.exit_code == 1:
+            raise WitnessError("RECEIVER_STATE_INVALID", "INVALID") from None
+        raise WitnessError("WITNESS_OR_STATE_UNAVAILABLE") from None
+
+
+def _current_receiver(store, stream, kind, original):
+    # Check the key actually used, even if a later adoption selects a new one.
+    # Selection and revocation come from the same read transaction.
+    selected = _select_receiver(store, stream, kind, checked_fingerprint=original["signer_fingerprint"])
+    if selected["checked_key_revoked"]:
+        raise WitnessError("RECEIVER_SIGNER_REVOKED", "INVALID")
+    if _snapshot(selected) != original:
+        raise WitnessError("RECEIVER_STATE_CHANGED")
+    return selected
+
+
+def _verified_receiver_snapshot(evidence, kind):
+    """Recover the used signer only from this call's authenticated adapter result."""
+    try:
+        handoff = evidence["receiver"]["handoff"]
+        authentication = handoff["authentication"]
+        if (type(handoff) is not dict or handoff.get("format") != "evidect-handoff-verification/1" or
+                handoff.get("local_status") != "VALID" or handoff.get("baseline_usable") is not True or
+                type(authentication) is not dict or authentication.get("format") != "evidect-observation-authentication/1" or
+                authentication.get("local_status") != "VALID" or authentication.get("baseline_usable") is not True):
+            raise WitnessError("RECEIVER_VERIFICATION_METADATA_UNAVAILABLE")
+        checks = authentication.get("checks")
+        if (type(checks) is not list or len(checks) != 4 or
+                any(type(item) is not dict or item.get("status") != "VALID" for item in checks) or
+                {item.get("name") for item in checks} != {"receipt_digest", "signature", "checkpoint", "checkpoint_expiry"}):
+            raise WitnessError("RECEIVER_VERIFICATION_METADATA_UNAVAILABLE")
+        original = {"store_id": evidence["store_id"], "revision": evidence["state_revision"], "kind": kind,
+                    "generation": evidence["generation"], "checkpoint_sha256": evidence["checkpoint_sha256"],
+                    "signer_fingerprint": authentication["key_fingerprint"], "revoked": False}
+        validate_snapshot(original)
+        return original
+    except (KeyError, TypeError, WitnessError):
+        # Missing trusted-verifier metadata is not evidence of a contradiction.
+        # Never substitute a sender's key or the store's newly selected signer.
+        raise WitnessError("RECEIVER_VERIFICATION_METADATA_UNAVAILABLE") from None
+
+
 def validate_snapshot(value):
     exact(value, ("store_id", "revision", "kind", "generation", "checkpoint_sha256", "signer_fingerprint", "revoked"))
     if not matches(STORE_ID, value["store_id"]) or not integer(value["revision"]) or not integer(value["generation"], 1) or not (
-            value["kind"] in ("runtime", "routing") and type(value["revoked"]) is bool and
+            value["kind"] in KINDS and type(value["revoked"]) is bool and
             matches(HEX, value["checkpoint_sha256"]) and matches(HEX, value["signer_fingerprint"])):
         raise WitnessError("WITNESS_SNAPSHOT_INVALID", "INVALID")
 
@@ -193,6 +258,10 @@ def _comparison(local, witnessed):
     if witnessed["generation"] > local["generation"]:
         return "INVALID", "RECEIVER_BEHIND_WITNESS"
     if witnessed["generation"] < local["generation"]:
+        # Revocation applies to the key, even when the witness still holds an
+        # older checkpoint. An unrelated old signer's revocation does not.
+        if witnessed["revoked"] and witnessed["signer_fingerprint"] == local["signer_fingerprint"]:
+            return "INVALID", "WITNESS_SIGNER_REVOKED"
         return "INDETERMINATE", "WITNESS_BEHIND_RECEIVER"
     if witnessed["checkpoint_sha256"] != local["checkpoint_sha256"] or witnessed["signer_fingerprint"] != local["signer_fingerprint"]:
         return "INVALID", "CHECKPOINT_DISAGREEMENT"
@@ -214,9 +283,14 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
     signed, raw_query, duration = None, None, None
     try:
         expected = trust(selected_trust)
-        local = snapshot(store, stream, kind)
+        if evidence["local_status"] == "VALID":
+            local = _verified_receiver_snapshot(evidence, kind)
+        else:
+            local = _snapshot(_select_receiver(store, stream, kind))
         if local["store_id"] == expected["store_id"]:
             raise WitnessError("WITNESS_STORE_NOT_SEPARATE", "INVALID")
+        if evidence["local_status"] == "VALID":
+            _current_receiver(store, stream, kind, local)
         if (local["store_id"], local["revision"], local["checkpoint_sha256"]) != (
                 evidence["store_id"], evidence["state_revision"], evidence["checkpoint_sha256"]):
             raise WitnessError("RECEIVER_STATE_CHANGED")
@@ -234,23 +308,22 @@ def verify(store, adapter, stream, kind, package, report, selected_trust, exchan
         if signed["key_fingerprint"] == local["signer_fingerprint"]:
             raise WitnessError("WITNESS_AND_RECEIPT_KEY_NOT_SEPARATE", "INVALID")
         status, reason = _comparison(local, witnessed)
-        current = snapshot(store, stream, kind)
-        if current != local:
-            if current["revoked"] and current["signer_fingerprint"] == local["signer_fingerprint"]:
-                raise WitnessError("RECEIVER_SIGNER_REVOKED", "INVALID")
-            raise WitnessError("RECEIVER_STATE_CHANGED")
+        _current_receiver(store, stream, kind, local)
         ended = _elapsed(monotonic)
-        duration = (ended - started) * 1000
+        measured = (ended - started) * 1000
+        # Injected finite clocks can overflow during conversion to milliseconds.
+        # Retain only values accepted by strict JSON result consumers.
+        if abs(measured) > MAX_INT or not math.isfinite(measured):
+            raise WitnessError("WITNESS_DURATION_CLOCK_INVALID")
+        duration = measured
         if ended < started or duration > expected["max_round_trip_ms"]:
             raise WitnessError("WITNESS_ROUND_TRIP_EXPIRED")
         finished = base.sample_time(clock)
-        selected = store.select(stream, kind)
+        selected = _current_receiver(store, stream, kind, local)
         if finished < evidence["completed_at_unix"]:
             raise WitnessError("LOCAL_CLOCK_REGRESSED")
         if finished >= selected["checkpoint"]["expires_at"]:
             raise WitnessError("CHECKPOINT_EXPIRED")
-        if snapshot(store, stream, kind) != local:
-            raise WitnessError("RECEIVER_STATE_CHANGED")
     except WitnessError as error:
         # A stale/failed freshness check cannot turn a known conflict into success.
         if status != "INVALID":
