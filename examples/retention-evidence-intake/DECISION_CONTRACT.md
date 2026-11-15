@@ -87,6 +87,21 @@ public key bytes, **not** SPKI DER or PEM text. The configured ID must match the
 key. The known RFC 8032 TEST 1 public demo key is rejected. No key in a decision
 or signature sidecar becomes trusted automatically.
 
+The local receiver additionally rejects all eight pure small-order Ed25519
+public keys and noncanonical point encodings (`y >= 2^255 - 19`, or a set
+sign bit when `x = 0`). These are trust-configuration errors:
+`REVIEW_KEY_SMALL_ORDER` or `REVIEW_KEY_ENCODING_NONCANONICAL`. Every configured
+reviewer key is checked, including unused keys, before any review decision can
+be prepared or verified. Previously, an identity key could admit signatures
+created without a private key on a permissive crypto backend and allow a
+synthetic review to reach `CLOSED_REVIEW` under that configured policy.
+
+This admission rule is specific to the experimental reviewer policy. It does
+not change VAP/VCP normative requirements, signature bytes, key IDs, existing
+source pins or stored results. Fresh generated Ed25519 keys remain accepted.
+Signature equations and `R`/`S` validation remain delegated to `cryptography`;
+the precheck is not a general prime-subgroup-membership or key-ownership proof.
+
 `roles` may be empty or contain `review` once; no other role is supported. An
 empty role list can still supply a key for mathematical signature checking,
 but cannot authorize review. The reviewer reference, role, case, target,

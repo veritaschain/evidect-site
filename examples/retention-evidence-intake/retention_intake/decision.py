@@ -19,6 +19,14 @@ REPORT_FORMAT = "evidect-retention-case-report/0.1"
 CRITERIA = "evidect-retention-review/0.1"
 DOMAIN = b"EVIDECT-RETENTION-REVIEW\x00v1\x00"
 PUBLIC_DEMO_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+ED25519_P = 2**255 - 19
+# Five y coordinates cover the eight pure small-order points, regardless of x sign.
+# This is a local reviewer-key admission rule, not a VAP/VCP signature policy.
+SMALL_ORDER_Y = {
+    0, 1, ED25519_P - 1,
+    int.from_bytes(bytes.fromhex("26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05"), "little"),
+    int.from_bytes(bytes.fromhex("c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a"), "little"),
+}
 CHECK_NAMES = ("signature", "checkpoint", "authorization_at_review", "authorization_now",
                "dossier_binding", "policy_binding", "decision_time", "current_context",
                "current_evidence", "current_boundaries", "disposition_coverage", "decision_expiry")
@@ -40,6 +48,16 @@ def _current(value):
     context(value["context"])
     timestamp(value["checked_at"])
     return value
+
+
+def _review_public_key(raw):
+    """Reject weak/aliased configured keys before delegating signatures to crypto."""
+    value = int.from_bytes(raw, "little")
+    y, sign = value & (2**255 - 1), value >> 255
+    if y >= ED25519_P or (y in (1, ED25519_P - 1) and sign):
+        raise IntakeError("REVIEW_KEY_ENCODING_NONCANONICAL")
+    if y in SMALL_ORDER_Y:
+        raise IntakeError("REVIEW_KEY_SMALL_ORDER")
 
 
 def validate_reviewer_trust(value, *, allow_synthetic=False):
@@ -69,6 +87,7 @@ def validate_reviewer_trust(value, *, allow_synthetic=False):
         if key["public_key_hex"] == PUBLIC_DEMO_KEY:
             raise IntakeError("PUBLIC_DEMO_KEY_NOT_ALLOWED")
         public = bytes.fromhex(key["public_key_hex"])
+        _review_public_key(public)
         if raw_digest(public) != key["key_id"] or key["key_id"] in seen:
             raise IntakeError("REVIEW_KEY_ID_MISMATCH_OR_DUPLICATE")
         seen.add(key["key_id"])
