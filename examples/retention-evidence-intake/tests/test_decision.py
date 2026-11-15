@@ -190,6 +190,23 @@ class RetentionDecisionTests(unittest.TestCase):
         with self.assertRaises(IntakeError):
             sign_decision(json_bytes(self.base_draft), pem(self.private), allow_synthetic=True)
 
+    def test_identity_key_forgery_cannot_close_an_otherwise_matching_review(self):
+        # Rebind the complete synthetic policy/decision/checkpoint so rejection
+        # comes from key admission, not an unrelated stale digest or wrong scope.
+        public = bytes.fromhex("01" + "00" * 31)
+        self.trust["keys"][0].update(public_key_hex=public.hex(), key_id=raw_digest(public))
+        self.body.update(key_id=raw_digest(public), reviewer_trust_sha256=digest(self.trust))
+        self.raw = json_bytes(self.body)
+        self.signature.update(decision_raw_sha256=raw_digest(self.raw), key_id=raw_digest(public),
+                              signature=(public + bytes(32)).hex())
+        self.checkpoint = checkpoint_for(self.raw)
+        before = deepcopy((self.snapshots, self.assignment, self.trust, self.current,
+                           self.raw, self.signature, self.checkpoint))
+        with self.assertRaisesRegex(IntakeError, "^REVIEW_KEY_SMALL_ORDER$"):
+            self.evaluate()
+        self.assertEqual((self.snapshots, self.assignment, self.trust, self.current,
+                          self.raw, self.signature, self.checkpoint), before)
+
     def test_explicit_synthetic_opt_in_is_required_by_all_public_apis(self):
         calls = [
             lambda: prepare_decision(self.snapshots, self.assignment, self.review_current, self.trust,
