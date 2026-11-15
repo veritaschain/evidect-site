@@ -12,6 +12,7 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("tested_witness", HERE / "witness.py")
 w = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(w)
+StateError = w.load_receiver().StateError
 KEYGEN = "const c=require('node:crypto'),k=c.generateKeyPairSync('ed25519');console.log(JSON.stringify({private:k.privateKey.export({format:'pem',type:'pkcs8'}),public:k.publicKey.export({format:'pem',type:'spki'})}));"
 
 
@@ -20,12 +21,19 @@ def pair():
 
 
 class FakeStore:
+    error_type = StateError
+
     def __init__(self, store_id):
+        self.revoked_fingerprints = set()
         self.selected = {"store_id": store_id, "revision": 1, "kind": "runtime", "generation": 2,
             "checkpoint_sha256": "a" * 64, "checkpoint": {"key_fingerprint": "b" * 64, "expires_at": 2000},
             "revoked": False}
-    def select(self, stream, kind):
-        return copy.deepcopy(self.selected)
+    def select(self, stream, kind, *, checked_fingerprint=None):
+        value = copy.deepcopy(self.selected)
+        if checked_fingerprint is not None:
+            value["checked_key_revoked"] = checked_fingerprint in self.revoked_fingerprints or (
+                value["revoked"] and value["checkpoint"]["key_fingerprint"] == checked_fingerprint)
+        return value
 
 
 class WitnessTests(unittest.TestCase):
@@ -41,7 +49,13 @@ class WitnessTests(unittest.TestCase):
             s = store.select(stream, kind)
             return {"local_status": "VALID", "overall_status": "INDETERMINATE", "store_id": s["store_id"],
                     "state_revision": s["revision"], "checkpoint_sha256": s["checkpoint_sha256"],
-                    "completed_at_unix": 1000}
+                    "generation": s["generation"], "completed_at_unix": 1000,
+                    "receiver": {"handoff": {"format": "evidect-handoff-verification/1", "local_status": "VALID",
+                        "baseline_usable": True, "authentication": {"format": "evidect-observation-authentication/1",
+                            "local_status": "VALID", "baseline_usable": True,
+                            "key_fingerprint": s["checkpoint"]["key_fingerprint"],
+                            "checks": [{"name": name, "status": "VALID"} for name in
+                                       ("receipt_digest", "signature", "checkpoint", "checkpoint_expiry")]}}}}
         self.base = types.SimpleNamespace(verify=verify, state=types.SimpleNamespace(identity=lambda *args: None),
                                           sample_time=lambda clock: int(clock()))
         self.patcher = patch.object(w, "load_receiver", return_value=self.base)
@@ -127,6 +141,22 @@ class WitnessTests(unittest.TestCase):
         result = self.check()
         self.assertEqual((result["local_status"], result["witness_reason"]), ("INDETERMINATE", "WITNESS_BEHIND_RECEIVER"))
 
+    def test_lagging_witness_revocation_applies_only_to_the_same_used_key(self):
+        for revoked, same_key in ((False, True), (True, True), (True, False)):
+            with self.subTest(revoked=revoked, same_key=same_key):
+                self.remote = FakeStore("2" * 32)
+                self.remote.selected.update(generation=1, revoked=revoked)
+                if not same_key:
+                    self.remote.selected["checkpoint"]["key_fingerprint"] = "c" * 64
+                result = self.check()
+                known_revoked = revoked and same_key
+                expected = "INVALID" if known_revoked else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["witness_reason"], "WITNESS_SIGNER_REVOKED" if known_revoked
+                                 else "WITNESS_BEHIND_RECEIVER")
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["signed_witness_response"])
+
     def test_same_generation_receipt_or_key_disagreement_is_invalid(self):
         for field in ("checkpoint_sha256", "checkpoint"):
             old = copy.deepcopy(self.remote.selected[field])
@@ -149,6 +179,67 @@ class WitnessTests(unittest.TestCase):
         for raw in (b"{}", b"null", b"[]", b"\xff", b"x" * (w.LIMIT + 1), b'{"x":1,"x":2}'):
             with self.subTest(raw=raw[:20]):
                 self.assertNotEqual(self.check(lambda _: raw)["local_status"], "VALID")
+
+    def test_nonfinite_json_numbers_in_queries_and_responses_are_invalid(self):
+        request = self.request()
+        response = self.reply(request)
+        marker = "__witness_test_number__"
+        query_template = self.request(nonce=marker)
+        for token in (b"NaN", b"Infinity", b"-Infinity", b"1e999", b"-1e999"):
+            with self.subTest(query_number=token):
+                raw_query = query_template.replace(w.encode(marker), token)
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.query(raw_query)
+                self.assertEqual((caught.exception.status, caught.exception.code),
+                                 ("INVALID", "WITNESS_NUMBER_INVALID"))
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.check_response(raw_query, response, self.trust)
+                self.assertEqual((caught.exception.status, caught.exception.code),
+                                 ("INVALID", "WITNESS_NUMBER_INVALID"))
+            for field in ("format", "witness_id", "query_sha256", "nonce", "stream"):
+                with self.subTest(response_field=field, response_number=token):
+                    envelope = json.loads(response)
+                    envelope["payload"][field] = marker
+                    raw_response = w.encode(envelope).replace(w.encode(marker), token)
+                    with self.assertRaises(w.WitnessError) as caught:
+                        w.check_response(request, raw_response, self.trust)
+                    self.assertEqual((caught.exception.status, caught.exception.code),
+                                     ("INVALID", "WITNESS_NUMBER_INVALID"))
+                    result = self.check(lambda _: raw_response)
+                    self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                                     ("INVALID", "INVALID", "INVALID"))
+                    self.assertEqual(result["witness_reason"], "WITNESS_NUMBER_INVALID")
+                    self.assertEqual(result["receiver"]["local_status"], "VALID")
+                    self.assertIsNone(result["signed_witness_response"])
+        # Finite floats still reach the existing field and signature checks.
+        for token in (b"1.5", b"1e308", b"1e-999"):
+            with self.subTest(finite_number=token):
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.query(query_template.replace(w.encode(marker), token))
+                self.assertEqual(caught.exception.code, "WITNESS_QUERY_INVALID")
+                envelope = json.loads(response)
+                envelope["payload"]["snapshot"]["generation"] = marker
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.check_response(request, w.encode(envelope).replace(w.encode(marker), token), self.trust)
+                self.assertEqual(caught.exception.code, "WITNESS_SNAPSHOT_INVALID")
+                envelope = json.loads(response)
+                envelope["payload"]["nonce"] = marker
+                with self.assertRaises(w.WitnessError) as caught:
+                    w.check_response(request, w.encode(envelope).replace(w.encode(marker), token), self.trust)
+                self.assertEqual(caught.exception.code, "WITNESS_SIGNATURE_INVALID")
+
+    def test_crypto_helper_nonfinite_numbers_stay_unavailable(self):
+        for operation, field in (("sign", "signature"), ("verify", "valid")):
+            for token in (b"NaN", b"1e999", b"-1e999"):
+                with self.subTest(operation=operation, number=token):
+                    raw = w.encode({"fingerprint": "a" * 64, field: "__witness_test_number__"})
+                    process = subprocess.CompletedProcess([], 0,
+                        stdout=raw.replace(w.encode("__witness_test_number__"), token), stderr=b"")
+                    with patch.object(w.subprocess, "run", return_value=process):
+                        with self.assertRaises(w.WitnessError) as caught:
+                            w.crypto(operation, {}, self.key["private" if operation == "sign" else "public"], "0" * 128)
+                    self.assertEqual((caught.exception.status, caught.exception.code),
+                                     ("INDETERMINATE", "WITNESS_CRYPTO_UNAVAILABLE"))
 
     def test_query_does_not_accept_checkpoint_key_path_or_nonce_errors(self):
         for field in ("checkpoint", "key", "path", "url"):
@@ -188,6 +279,190 @@ class WitnessTests(unittest.TestCase):
             return response
         self.assertEqual(self.check(exchange)["witness_reason"], "RECEIVER_SIGNER_REVOKED")
 
+    def test_initial_witness_read_retains_used_key_revocation_after_base_verification(self):
+        original = self.base.verify
+        for revoke, rotate, same_store in ((True, False, False), (True, True, False),
+                                           (False, True, False), (False, True, True)):
+            with self.subTest(revoke=revoke, rotate=rotate, same_store=same_store):
+                self.local = FakeStore("1" * 32)
+                self.trust["store_id"] = "1" * 32 if same_store else "2" * 32
+                calls = []
+                def verify_then_change(*args, **kwargs):
+                    checked = original(*args, **kwargs)
+                    if revoke:
+                        self.local.revoked_fingerprints.add("b" * 64)
+                        self.local.selected["revoked"] = True
+                    if rotate:
+                        self.local.selected.update(generation=3, checkpoint_sha256="d" * 64, revoked=False)
+                        self.local.selected["checkpoint"]["key_fingerprint"] = "c" * 64
+                    self.local.selected["revision"] += 1
+                    return checked
+                with patch.object(self.base, "verify", side_effect=verify_then_change):
+                    result = self.check(lambda query: calls.append(query))
+                expected = "INVALID" if revoke or same_store else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["witness_reason"], "WITNESS_STORE_NOT_SEPARATE" if same_store else
+                                 "RECEIVER_SIGNER_REVOKED" if revoke else "RECEIVER_STATE_CHANGED")
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertEqual(result["receiver"]["generation"], 2)
+                self.assertIsNone(result["query_sha256"])
+                self.assertIsNone(result["signed_witness_response"])
+                self.assertEqual(calls, [])
+
+    def test_local_state_error_classification_preserves_known_signed_conflicts(self):
+        original_verify = self.base.verify
+        for stage in ("initial", "after-response", "final-clock"):
+            for code, exit_code in (("STREAM_SCOPE_MISMATCH", 1), ("STATE_UNAVAILABLE", 2), ("STATE_CORRUPT", 2)):
+                for known_conflict in ((False,) if stage == "initial" else (False, True)):
+                    with self.subTest(stage=stage, code=code, known_conflict=known_conflict):
+                        self.local, self.remote = FakeStore("1" * 32), FakeStore("2" * 32)
+                        if known_conflict:
+                            self.remote.selected["generation"] += 1
+                        phase = ["base"]
+                        select = self.local.select
+                        def failing_select(*args, **kwargs):
+                            if phase[0] == stage:
+                                raise StateError(code, exit_code)
+                            return select(*args, **kwargs)
+                        def finish_base(*args, **kwargs):
+                            result = original_verify(*args, **kwargs)
+                            phase[0] = "initial"
+                            return result
+                        def exchange(query):
+                            response = self.reply(query)
+                            phase[0] = "after-response"
+                            return response
+                        def finish_clock(_clock):
+                            phase[0] = "final-clock"
+                            return 1000
+                        with patch.object(self.local, "select", side_effect=failing_select), \
+                                patch.object(self.base, "verify", side_effect=finish_base), \
+                                patch.object(self.base, "sample_time", side_effect=finish_clock):
+                            result = self.check(exchange)
+                        expected = "INVALID" if known_conflict or exit_code == 1 else "INDETERMINATE"
+                        reason = "RECEIVER_BEHIND_WITNESS" if known_conflict else (
+                            "RECEIVER_STATE_INVALID" if exit_code == 1 else "WITNESS_OR_STATE_UNAVAILABLE")
+                        self.assertEqual((result["local_status"], result["witness_status"]), (expected, expected))
+                        self.assertEqual(result["witness_reason"], reason)
+                        self.assertEqual(result["receiver"]["local_status"], "VALID")
+                        self.assertEqual(result["signed_witness_response"] is None, stage == "initial")
+                        self.assertEqual(result["query_sha256"] is None, stage == "initial")
+
+    def test_transport_state_error_is_not_an_authenticated_receiver_contradiction(self):
+        for exit_code in (1, 2):
+            with self.subTest(exit_code=exit_code):
+                def exchange(_query):
+                    raise StateError("private-unverified-transport-claim", exit_code)
+                result = self.check(exchange)
+                self.assertEqual((result["local_status"], result["witness_reason"]),
+                                 ("INDETERMINATE", "WITNESS_OR_STATE_UNAVAILABLE"))
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["query_sha256"])
+                self.assertIsNone(result["signed_witness_response"])
+                self.assertNotIn("private-unverified-transport-claim", json.dumps(result))
+
+    def test_unrecognized_local_exceptions_cannot_claim_invalid_by_exit_code(self):
+        original = self.base.verify
+        for undeclared in (False, True):
+            for own_error in (False, True):
+                with self.subTest(undeclared=undeclared, own_error=own_error):
+                    error = StateError("private-unverified-local-claim", 1) if own_error else ValueError("private-unverified-local-claim")
+                    error.exit_code = 1
+                    select = self.local.select
+                    ready = [False]
+                    def failing_select(*args, **kwargs):
+                        if ready[0]:
+                            raise error
+                        return select(*args, **kwargs)
+                    def finish_base(*args, **kwargs):
+                        result = original(*args, **kwargs)
+                        ready[0] = True
+                        return result
+                    with patch.object(FakeStore, "error_type", None if undeclared else StateError), \
+                            patch.object(self.local, "select", side_effect=failing_select), \
+                            patch.object(self.base, "verify", side_effect=finish_base):
+                        result = self.check()
+                    declared_match = own_error and not undeclared
+                    self.assertEqual(result["local_status"], "INVALID" if declared_match else "INDETERMINATE")
+                    self.assertEqual(result["witness_reason"], "RECEIVER_STATE_INVALID" if declared_match
+                                     else "WITNESS_OR_STATE_UNAVAILABLE")
+                    self.assertIsNone(result["query_sha256"])
+                    self.assertIsNone(result["signed_witness_response"])
+                    self.assertNotIn("private-unverified-local-claim", json.dumps(result))
+
+    def test_used_signer_requires_complete_verified_adapter_metadata(self):
+        original = self.base.verify
+        def remove_authentication(result):
+            del result["receiver"]["handoff"]["authentication"]
+        changes = [remove_authentication,
+            lambda result: result.update(generation=True),
+            lambda result: result["receiver"]["handoff"].update(baseline_usable=False)]
+        for field, value in (("format", "unsupported"), ("local_status", "INDETERMINATE"),
+                             ("baseline_usable", False), ("key_fingerprint", None),
+                             ("key_fingerprint", "B" * 64), ("key_fingerprint", True)):
+            changes.append(lambda result, field=field, value=value:
+                result["receiver"]["handoff"]["authentication"].update({field: value}))
+        for index in range(4):
+            changes.append(lambda result, index=index:
+                result["receiver"]["handoff"]["authentication"]["checks"][index].update(status="INDETERMINATE"))
+        for change in changes:
+            calls = []
+            def verify_with_bad_metadata(*args, **kwargs):
+                result = original(*args, **kwargs)
+                change(result)
+                return result
+            with self.subTest(change=change), patch.object(self.base, "verify", side_effect=verify_with_bad_metadata):
+                result = self.check(lambda query: calls.append(query))
+                self.assertEqual((result["local_status"], result["overall_status"]), ("INDETERMINATE", "INDETERMINATE"))
+                self.assertEqual(result["witness_reason"], "RECEIVER_VERIFICATION_METADATA_UNAVAILABLE")
+                self.assertIsNone(result["query_sha256"])
+                self.assertIsNone(result["signed_witness_response"])
+                self.assertEqual(calls, [])
+
+    def test_used_key_revocation_is_not_hidden_by_a_new_selection(self):
+        for revoked in (False, True):
+            with self.subTest(used_key_revoked=revoked):
+                self.local = FakeStore("1" * 32)
+
+                def exchange(q):
+                    response = self.reply(q)
+                    if revoked:
+                        self.local.revoked_fingerprints.add(self.local.selected["checkpoint"]["key_fingerprint"])
+                    self.local.selected.update(revision=2, generation=3, checkpoint_sha256="d" * 64)
+                    self.local.selected["checkpoint"]["key_fingerprint"] = "c" * 64
+                    return response
+
+                result = self.check(exchange)
+                expected = "INVALID" if revoked else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["witness_reason"], "RECEIVER_SIGNER_REVOKED" if revoked else "RECEIVER_STATE_CHANGED")
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["signed_witness_response"])
+
+    def test_revocation_after_response_checks_precedes_expiry(self):
+        for phase in ("duration_end", "final_time"):
+            with self.subTest(phase=phase):
+                self.local = FakeStore("1" * 32)
+                ticks = []
+
+                def monotonic():
+                    ticks.append(1)
+                    if phase == "duration_end" and len(ticks) == 2:
+                        self.local.selected["revoked"] = True
+                    return float(len(ticks))
+
+                def finish(_clock):
+                    if phase == "final_time":
+                        self.local.selected["revoked"] = True
+                    return self.local.selected["checkpoint"]["expires_at"]
+
+                self.base.sample_time = finish
+                result = self.check(monotonic=monotonic)
+                self.assertEqual((result["local_status"], result["witness_reason"]), ("INVALID", "RECEIVER_SIGNER_REVOKED"))
+                self.assertEqual(result["receiver"]["local_status"], "VALID")
+                self.assertIsNotNone(result["signed_witness_response"])
+                self.assertEqual(result["round_trip_ms"], 1000)
+
     def test_witness_mutation_during_signing_is_not_served(self):
         original = w.crypto
         def mutate(*args, **kwargs):
@@ -203,6 +478,30 @@ class WitnessTests(unittest.TestCase):
             clock = iter((10.0, end))
             result = self.check(monotonic=lambda: next(clock))
             self.assertEqual((result["local_status"], result["witness_reason"]), ("INDETERMINATE", "WITNESS_ROUND_TRIP_EXPIRED"))
+            self.assertEqual(result["round_trip_ms"], (end - 10.0) * 1000)
+            json.dumps(result, allow_nan=False)
+
+    def assert_unrepresentable_duration_preserves_verdict(self, end):
+        for conflict in (False, True):
+            with self.subTest(known_conflict=conflict):
+                self.local.selected["generation"] = 1 if conflict else 2
+                clock = iter((0.0, end))
+                result = self.check(monotonic=lambda: next(clock))
+                expected = "INVALID" if conflict else "INDETERMINATE"
+                reason = "RECEIVER_BEHIND_WITNESS" if conflict else "WITNESS_DURATION_CLOCK_INVALID"
+                self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                                 (expected, expected, expected))
+                self.assertEqual(result["witness_reason"], reason)
+                self.assertIsNotNone(result["signed_witness_response"])
+                self.assertIsNone(result["round_trip_ms"])
+                encoded = json.dumps(result, allow_nan=False)
+                self.assertEqual(json.loads(encoded), result)
+
+    def test_finite_clock_overflow_has_serializable_result(self):
+        self.assert_unrepresentable_duration_preserves_verdict(1e308)
+
+    def test_finite_duration_outside_json_safe_range_has_serializable_result(self):
+        self.assert_unrepresentable_duration_preserves_verdict(1e13)
 
     def test_invalid_duration_clock_fails_closed(self):
         for value in (True, float("nan"), float("inf"), -1):
@@ -235,7 +534,9 @@ class WitnessTests(unittest.TestCase):
     def test_known_witness_conflict_survives_timeout(self):
         self.local.selected["generation"] = 1
         clock = iter((10.0, 100.0))
-        self.assertEqual(self.check(monotonic=lambda: next(clock))["local_status"], "INVALID")
+        result = self.check(monotonic=lambda: next(clock))
+        self.assertEqual(result["local_status"], "INVALID")
+        self.assertEqual(result["round_trip_ms"], 90000)
 
     def test_repeated_live_checks_have_new_challenges(self):
         queries = []
@@ -246,10 +547,14 @@ class WitnessTests(unittest.TestCase):
         self.assertNotEqual(json.loads(queries[0])["nonce"], json.loads(queries[1])["nonce"])
 
     def test_invalid_trust_never_runs_exchange(self):
-        for value in (None, {}, {**self.trust, "max_round_trip_ms": True}, {**self.trust, "max_round_trip_ms": 30001}):
+        for value in (None, {}, {**self.trust, "max_round_trip_ms": True}, {**self.trust, "max_round_trip_ms": 30001},
+                      {**self.trust, "max_round_trip_ms": float("inf")}, {**self.trust, "witness_id": float("-inf")}):
             self.trust = value
             result = self.check(lambda _: self.fail("unusable trust must not make request"))
-            self.assertNotEqual(result["local_status"], "VALID")
+            self.assertEqual((result["local_status"], result["overall_status"], result["witness_status"]),
+                             ("INDETERMINATE", "INDETERMINATE", "INDETERMINATE"))
+            self.assertEqual(result["witness_reason"], "WITNESS_TRUST_INVALID")
+            self.assertIsNone(result["query_sha256"])
 
     def test_same_store_identity_is_not_a_separate_witness(self):
         self.trust["store_id"] = self.local.selected["store_id"]

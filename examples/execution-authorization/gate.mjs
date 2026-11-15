@@ -1,5 +1,6 @@
 /** Experimental, synchronous authorization fixture (in-memory tool; optional replay store). Not a production adapter. */
 import { createHash, sign, verify } from 'node:crypto';
+import { isProxy } from 'node:util/types';
 
 const REQUEST_DOMAIN = 'EVIDECT-EXPERIMENTAL-REQUEST/1\0';
 const APPROVAL_DOMAIN = 'EVIDECT-EXPERIMENTAL-APPROVAL/1\0';
@@ -10,7 +11,7 @@ const integer = x => Number.isSafeInteger(x) && x >= 0;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 function requireInput(ok) { if (!ok) throw new TypeError('INVALID_EXPERIMENT_INPUT'); }
 function record(value, fields) {
-  requireInput(value !== null && typeof value === 'object' &&
+  requireInput(value !== null && typeof value === 'object' && !isProxy(value) &&
     [Object.prototype, null].includes(Object.getPrototypeOf(value)));
   const keys = Reflect.ownKeys(value);
   requireInput(keys.length === fields.length && fields.every(k => keys.includes(k)));
@@ -91,6 +92,13 @@ function open(envelope, keys, snapshot, bytes, subjectField) {
     return { status: 'INVALID', reason: 'MALFORMED_ENVELOPE' };
   }
 }
+
+// Pure signature/subject checks. These do not consult policy, authenticate a
+// session, consume a nonce, or execute the toy tool. Trust is a separate input.
+export const verifyRequest = (envelope, issuerKeys) =>
+  open(envelope, trustMap(issuerKeys), requestSnapshot, requestBytes, 'issuer');
+export const verifyApproval = (envelope, approverKeys) =>
+  open(envelope, trustMap(approverKeys), approvalSnapshot, approvalBytes, 'approver');
 
 /**
  * state and session are TRUSTED harness inputs, not assertions read from a task.

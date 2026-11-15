@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -54,6 +55,12 @@ def strict_json(raw):
         return result
     def reject_constant(_):
         fail("NONFINITE_JSON")
+    def finite_float(token):
+        # Exponent overflow does not pass through parse_constant.
+        value = float(token)
+        if not math.isfinite(value):
+            fail("NONFINITE_JSON")
+        return value
     try:
         text = raw.decode("utf-8", "strict")
         depth, quoted, escaped = 0, False, False
@@ -73,8 +80,11 @@ def strict_json(raw):
                     fail("JSON_DEPTH_LIMIT")
             elif char in "]}":
                 depth -= 1
-        return json.loads(text, object_pairs_hook=pairs, parse_constant=reject_constant)
-    except (UnicodeError, json.JSONDecodeError, RecursionError):
+        return json.loads(text, object_pairs_hook=pairs, parse_constant=reject_constant, parse_float=finite_float)
+    except ObservationError:
+        raise
+    except (UnicodeError, ValueError, RecursionError):
+        # Includes Python's integer-string conversion limit.
         fail("INVALID_JSON_OR_UTF8")
 
 

@@ -198,11 +198,62 @@ class StateTests(unittest.TestCase):
             db.execute("UPDATE streams SET digest=?", ("0" * 64,))
         self.assert_code("STATE_CORRUPT", self.store.select, "s", "runtime")
 
+    def test_deep_stored_checkpoint_is_unavailable_before_verification(self):
+        self.adopt()
+        deep = "[" * 10000 + "0" + "]" * 10000
+        with sqlite3.connect(self.store.path) as db:
+            db.execute("UPDATE streams SET checkpoint=?", (deep,))
+            self.assertEqual(db.execute("PRAGMA quick_check(1)").fetchone(), ("ok",))
+        before = self.store.path.read_bytes()
+        self.assertLessEqual(len(before), state.MAX_DB_BYTES)
+        with self.assertRaises(StateError) as caught:
+            self.store.select("s", "runtime")
+        self.assertEqual((caught.exception.code, caught.exception.exit_code), ("STATE_UNAVAILABLE", 2))
+        adapter = AdapterStub()
+        self.assert_code("STATE_UNAVAILABLE", receiver.verify, self.store, adapter, "s", "runtime",
+                         PACKAGE, b"report", clock=lambda: NOW)
+        self.assertEqual(adapter.calls, 0)
+        package, report = self.base / "package", self.base / "report"
+        package.write_bytes(PACKAGE)
+        report.write_bytes(b"report")
+        checked = subprocess.run([sys.executable, "-I", "-B", str(HERE / "receiver.py"), "verify",
+            "--state-dir", str(self.directory), "--stream", "s", "--kind", "runtime",
+            "--package", str(package), "--report", str(report)], capture_output=True, timeout=10)
+        self.assertEqual((checked.returncode, checked.stderr), (2, b""))
+        self.assertEqual(json.loads(checked.stdout), {"format": "evidect-receiver-state-error/1",
+            "error": "STATE_UNAVAILABLE", "local_status": "INDETERMINATE"})
+        self.assertEqual(self.store.path.read_bytes(), before)
+
     def test_state_reads_do_not_write_or_consume(self):
         self.adopt()
         before = self.store.path.read_bytes()
         self.assertEqual(self.store.select("s", "runtime"), self.store.select("s", "runtime"))
         self.assertEqual(before, self.store.path.read_bytes())
+
+    def test_checked_signer_revocation_is_separate_and_read_only(self):
+        self.adopt()
+        self.store.revoke(KEY)
+        self.adopt(pin(2, key="c" * 64), public="TEST-ONLY-NEW-PUBLIC-KEY")
+        before = self.store.path.read_bytes()
+        current = self.store.select("s", "runtime")
+        self.assertIs(current["revoked"], False)
+        self.assertNotIn("checked_key_revoked", current)
+        self.assertEqual(self.store.select("s", "runtime", checked_fingerprint=None), current)
+        for selected_key, expected in ((KEY, True), ("c" * 64, False), ("d" * 64, False)):
+            with self.subTest(fingerprint=selected_key):
+                selected = self.store.select("s", "runtime", checked_fingerprint=selected_key)
+                self.assertIs(selected.pop("checked_key_revoked"), expected)
+                self.assertEqual(selected, current)
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_checked_signer_fingerprint_is_strict(self):
+        self.adopt()
+        before = self.store.path.read_bytes()
+        for value in (True, 1, b"a" * 64, "", "a" * 63, "a" * 65, "A" * 64, "g" * 64):
+            with self.subTest(value=value):
+                self.assert_code("KEY_FINGERPRINT_INVALID", self.store.select,
+                                 "s", "runtime", checked_fingerprint=value)
+        self.assertEqual(self.store.path.read_bytes(), before)
 
     def test_concurrent_adoption_never_ends_at_older_generation(self):
         ctx = multiprocessing.get_context("spawn")
@@ -250,6 +301,42 @@ class StateTests(unittest.TestCase):
                              PACKAGE, b"report", PUBLIC, pin(), clock=lambda: NOW)
         self.assert_code("STREAM_NOT_PROVISIONED", self.store.select, "s", "runtime")
 
+    def test_typed_adapter_errors_keep_classification_without_adopting(self):
+        for kind in ("runtime", "routing"):
+            adapter = receiver.load_adapter(kind)
+            error_type = getattr(adapter, receiver.ADAPTER_ERRORS[kind])
+            self.adopt(stream=kind, kind=kind)
+            before = self.store.path.read_bytes()
+            for exit_code, expected in ((1, "ADAPTER_INPUT_INVALID"), (2, "ADAPTER_VERIFIER_UNAVAILABLE")):
+                for adopting in (False, True):
+                    with self.subTest(kind=kind, exit_code=exit_code, adopting=adopting), \
+                            patch.object(adapter, "verify_delivery", side_effect=error_type("private-adapter-details", exit_code)):
+                        with self.assertRaises(StateError) as caught:
+                            if adopting:
+                                receiver.adopt(self.store, adapter, kind, kind, PACKAGE, b"report", PUBLIC, pin(2), clock=lambda: NOW)
+                            else:
+                                receiver.verify(self.store, adapter, kind, kind, PACKAGE, b"report", clock=lambda: NOW)
+                        self.assertEqual((caught.exception.code, caught.exception.exit_code), (expected, exit_code))
+                        self.assertNotIn("private-adapter-details", str(caught.exception))
+                        self.assertEqual(self.store.path.read_bytes(), before)
+                        self.assertEqual(self.store.select(kind, kind)["generation"], 1)
+
+    def test_unrecognized_adapter_errors_do_not_claim_invalid_by_name_or_exit_code(self):
+        for kind in ("runtime", "routing"):
+            adapter = receiver.load_adapter(kind)
+            self.adopt(stream=kind, kind=kind)
+            before = self.store.path.read_bytes()
+            same_named_type = type(receiver.ADAPTER_ERRORS[kind], (ValueError,), {})
+            for error in (ValueError("private-details"), same_named_type("private-details")):
+                error.exit_code = 1
+                with self.subTest(kind=kind, error_type=type(error)), \
+                        patch.object(adapter, "verify_delivery", side_effect=error):
+                    with self.assertRaises(ValueError) as caught:
+                        receiver.verify(self.store, adapter, kind, kind, PACKAGE, b"report", clock=lambda: NOW)
+                    self.assertIs(caught.exception, error)
+                    self.assertNotIsInstance(caught.exception, StateError)
+                    self.assertEqual(self.store.path.read_bytes(), before)
+
     def test_wrapper_uses_saved_pin_and_keeps_assurance_limits(self):
         receiver.adopt(self.store, AdapterStub(), "s", "runtime", PACKAGE, b"report", PUBLIC, pin(), clock=lambda: NOW)
         result = receiver.verify(self.store, AdapterStub(), "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
@@ -285,6 +372,145 @@ class StateTests(unittest.TestCase):
         adapter = AdapterStub("INVALID", effect=lambda: self.adopt(pin(2)))
         result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
         self.assertEqual(result["local_status"], "INVALID")
+
+    def test_final_state_read_failure_preserves_evidence_and_error_classification(self):
+        self.adopt()
+        selected = self.store.select("s", "runtime")
+        before = self.store.path.read_bytes()
+        for evidence in ("VALID", "INVALID", "INDETERMINATE"):
+            for code, exit_code in (("STATE_UNAVAILABLE", 2), ("STATE_CORRUPT", 2), ("STREAM_SCOPE_MISMATCH", 1)):
+                for end in (NOW + 1, None):
+                    with self.subTest(evidence=evidence, code=code, end=end):
+                        adapter = AdapterStub(evidence)
+                        samples = iter((NOW, end))
+                        with patch.object(self.store, "select", side_effect=[selected, StateError(code, exit_code)]):
+                            result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report",
+                                                     clock=lambda: next(samples))
+                        expected = "INVALID" if evidence == "INVALID" or exit_code == 1 else "INDETERMINATE"
+                        self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                        self.assertEqual(result["state_reason"], "FINAL_STATE_INVALID" if exit_code == 1
+                                         else "FINAL_STATE_UNAVAILABLE")
+                        self.assertEqual(result["receiver"]["local_status"], evidence)
+                        self.assertEqual(result["completed_at_unix"], end)
+                        self.assertEqual(result["evaluated_at_unix"], NOW)
+                        self.assertEqual(result["checkpoint_sha256"], selected["checkpoint_sha256"])
+                        self.assertEqual(adapter.calls, 1)
+                        json.dumps(result, allow_nan=False)
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_independent_store_error_contract_preserves_completed_evidence(self):
+        spec = importlib.util.spec_from_file_location("independent_state_contract", HERE / "state.py")
+        independent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(independent)
+        self.assertIsNot(independent.StateError, StateError)
+        for evidence in ("VALID", "INVALID"):
+            for unavailable in (False, True):
+                with self.subTest(evidence=evidence, unavailable=unavailable):
+                    store = independent.Store.create(self.base / (evidence + "-" + str(unavailable)))
+                    store.adopt("s", "runtime", pin(), PUBLIC, now=NOW)
+                    saved = store.directory / "unavailable.sqlite3"
+                    after_actions = []
+                    def fail_state():
+                        if unavailable:
+                            store.path.rename(saved)
+                        else:
+                            with sqlite3.connect(store.path) as db:
+                                db.execute("UPDATE streams SET kind='routing'")
+                        after_actions.append((saved if unavailable else store.path).read_bytes())
+                    adapter = AdapterStub(evidence, fail_state)
+                    samples = iter((NOW, NOW + 1))
+                    result = receiver.verify(store, adapter, "s", "runtime", PACKAGE, b"report", clock=lambda: next(samples))
+                    expected = "INVALID" if evidence == "INVALID" or not unavailable else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["state_reason"], "FINAL_STATE_UNAVAILABLE" if unavailable else "FINAL_STATE_INVALID")
+                    self.assertEqual(result["receiver"]["local_status"], evidence)
+                    self.assertEqual((result["evaluated_at_unix"], result["completed_at_unix"]), (NOW, NOW + 1))
+                    self.assertEqual(adapter.calls, 1)
+                    self.assertEqual((saved if unavailable else store.path).read_bytes(), after_actions[0])
+                    if unavailable:
+                        self.assertFalse(store.path.exists())
+        store = independent.Store.create(self.base / "unrecognized-final-read")
+        store.adopt("s", "runtime", pin(), PUBLIC, now=NOW)
+        selected, before = store.select("s", "runtime"), store.path.read_bytes()
+        for error in (ValueError("private-details"), StateError("private-details", 1)):
+            error.exit_code = 1
+            with self.subTest(unrecognized_type=type(error)), \
+                    patch.object(store, "select", side_effect=[selected, error]), self.assertRaises(ValueError) as caught:
+                receiver.verify(store, AdapterStub(), "s", "runtime", PACKAGE, b"report", clock=lambda: NOW)
+            self.assertIs(caught.exception, error)
+            self.assertEqual(store.path.read_bytes(), before)
+
+    def test_independent_store_deep_checkpoint_retains_completed_evidence(self):
+        spec = importlib.util.spec_from_file_location("independent_deep_state_contract", HERE / "state.py")
+        independent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(independent)
+        self.assertIsNot(independent.StateError, StateError)
+        deep = "[" * 10000 + "0" + "]" * 10000
+        for evidence in ("VALID", "INVALID", "INDETERMINATE"):
+            with self.subTest(evidence=evidence):
+                store = independent.Store.create(self.base / evidence)
+                store.adopt("s", "runtime", pin(), PUBLIC, now=NOW)
+                selected = store.select("s", "runtime")
+                after_actions = []
+                def corrupt_checkpoint():
+                    with sqlite3.connect(store.path) as db:
+                        db.execute("UPDATE streams SET checkpoint=?", (deep,))
+                    after_actions.append(store.path.read_bytes())
+                adapter = AdapterStub(evidence, corrupt_checkpoint)
+                samples = iter((NOW, NOW + 1))
+                result = receiver.verify(store, adapter, "s", "runtime", PACKAGE, b"report",
+                                         clock=lambda: next(samples))
+                expected = "INVALID" if evidence == "INVALID" else "INDETERMINATE"
+                self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                self.assertEqual(result["state_reason"], "FINAL_STATE_UNAVAILABLE")
+                self.assertEqual(result["receiver"]["local_status"], evidence)
+                self.assertEqual((result["evaluated_at_unix"], result["completed_at_unix"]), (NOW, NOW + 1))
+                self.assertEqual(result["checkpoint_sha256"], selected["checkpoint_sha256"])
+                self.assertEqual(adapter.calls, 1)
+                with self.assertRaises(independent.StateError) as caught:
+                    store.select("s", "runtime")
+                self.assertEqual((caught.exception.code, caught.exception.exit_code), ("STATE_UNAVAILABLE", 2))
+                self.assertEqual(store.path.read_bytes(), after_actions[0])
+                json.dumps(result, allow_nan=False)
+
+    def test_final_clock_failure_preserves_completed_evidence_without_invented_time(self):
+        self.adopt()
+        before = self.store.path.read_bytes()
+        for evidence in ("VALID", "INVALID", "INDETERMINATE"):
+            for end in (None, float("nan"), 253402300800, RuntimeError("private-clock-details")):
+                with self.subTest(evidence=evidence, end=end):
+                    samples = iter((NOW, end))
+                    def clock():
+                        value = next(samples)
+                        if isinstance(value, Exception):
+                            raise value
+                        return value
+                    adapter = AdapterStub(evidence)
+                    result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report", clock=clock)
+                    expected = "INVALID" if evidence == "INVALID" else "INDETERMINATE"
+                    self.assertEqual((result["local_status"], result["overall_status"]), (expected, expected))
+                    self.assertEqual(result["state_reason"], "LOCAL_CLOCK_UNAVAILABLE")
+                    self.assertEqual(result["receiver"]["local_status"], evidence)
+                    self.assertEqual(result["evaluated_at_unix"], NOW)
+                    self.assertIsNone(result["completed_at_unix"])
+                    self.assertEqual(adapter.calls, 1)
+                    self.assertNotIn("private-clock-details", json.dumps(result, allow_nan=False))
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+    def test_observed_revocation_survives_unavailable_final_clock(self):
+        self.adopt()
+        after_revoke = []
+        def revoke():
+            self.store.revoke(KEY)
+            after_revoke.append(self.store.path.read_bytes())
+        adapter = AdapterStub(effect=revoke)
+        samples = iter((NOW, None))
+        result = receiver.verify(self.store, adapter, "s", "runtime", PACKAGE, b"report", clock=lambda: next(samples))
+        self.assertEqual((result["local_status"], result["state_reason"]), ("INVALID", "KEY_REVOKED"))
+        self.assertEqual(result["receiver"]["local_status"], "VALID")
+        self.assertIsNone(result["completed_at_unix"])
+        self.assertEqual(adapter.calls, 1)
+        self.assertEqual(self.store.path.read_bytes(), after_revoke[0])
 
     def test_clock_regression_and_expiry_during_verification(self):
         self.adopt()

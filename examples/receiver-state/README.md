@@ -15,6 +15,13 @@
 - `revoke`は公開鍵fingerprintをローカルで失効扱いにします。このDBには失効取消し操作を設けていません。別の鍵への更新は、別途選択した鍵で検証できる、より新しい世代の採用として扱います。
 - 検証後に新しい読取りトランザクションで状態を再確認します。途中で状態が変われば`INDETERMINATE`、使用鍵が失効していれば`INVALID`です。証拠自体の既知の不一致は`INVALID`を維持します。
 
+[credential用の追加受領経路](../execution-authorization/credential-lifecycle/WITNESS.md)も、この保存層を使います。
+専用の`receive.py`は、元のevidence・別途選んだtrust・期待inventoryの3入力を署名付きreceiptと対応付け、
+原署名と整合性を再検証します。保存するのはreceipt署名者の公開鍵とcheckpointです。
+3入力そのものやproviderの真正性をDBへの保存で証明するものではありません。
+credential経路の採用・検証には専用CLIを使い、`init`・`revoke`は本CLIを使います。
+SQLiteの保存形式、既存checkpoint形式、runtime/routingの手順は変更しません。
+
 `stream`は受取側が決める名前です。未信頼の入力からstreamを選んだり、都合よく別streamを作成してはいけません。service・environment・scope・policy_revisionが異なるものは、同じstreamへ混在できません。
 
 ## 再現手順
@@ -55,7 +62,30 @@ python3 -I -B examples/receiver-state/receiver.py revoke \
 
 終了コードは`0`がこのローカル検証の`VALID`、`1`が既知の不一致・失効等の`INVALID`、`2`が証拠・状態・検証手段の不足等の`INDETERMINATE`です。未設定・破損・ロック中・失われたDBを空の成功状態へ自動復旧しません。
 
-上位レポートは`evidect-stateful-receiver/1`。元の`receiver/2`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
+runtime/routingの元adapterが、不正な署名形式等を型付きの入力エラーとして拒否した場合も、
+`ADAPTER_INPUT_INVALID`・終了コード1を維持します。元adapterの検証手段が利用不能なら
+`ADAPTER_VERIFIER_UNAVAILABLE`・終了コード2です。任意の例外に付いた終了コードやメッセージを
+検証結果として採用しません。adapterが結果を返す前の失敗では、完了済みの内側レポートを作りません。
+この区別は採用前の検証にも適用し、拒否された候補をDBへ保存しません。
+元receiptのJSONでは、数値変換で非有限になる指数表記や、整数変換制限による解析失敗も入力不正として
+扱います。これらを暗号検証器の停止として報告しません。有限値の受理条件は既存の各フィールド検査に従います。
+
+上位レポートは`evidect-stateful-receiver/1`。runtime/routingの元の`receiver/2`、またはcredential用の`evidect-credential-receiver/1`を`receiver`に保持します。途中の更新で上位判定が不明になった場合、内側の過去の`VALID`を現在の成功として採用してはいけません。`overall_status`は既知の不一致で`INVALID`、それ以外は`INDETERMINATE`です。
+
+元の検証を完了した後に最終状態の読取りや時計の取得が失敗しても、その検証結果を保持します。
+最終状態を確認できなければ`FINAL_STATE_UNAVAILABLE`、読取りで明確なスコープ不一致を確認した場合は
+`FINAL_STATE_INVALID`です。時計を取得できない場合は`LOCAL_CLOCK_UNAVAILABLE`を返しますが、
+すでに確認した鍵失効等の状態理由があれば、それを優先します。どの場合も既知の`INVALID`を失わせず、
+不足しか判明していない場合は`INDETERMINATE`です。最終時計を取得できなかった結果では
+`completed_at_unix`を`null`とし、開始時刻等で補いません。最終状態の読取り失敗は、最新状態の確認成功を意味しません。
+
+保存されたcheckpointのJSONが深すぎて解析に失敗した場合も、保存層は`STATE_UNAVAILABLE`として返します。
+最初の読取りなら未確定のまま検証を開始せず、完了済みの検証後なら`FINAL_STATE_UNAVAILABLE`と元結果を
+保持します。署名不一致等の既知の`INVALID`は失わせません。DBの修復・初期化は行いません。
+
+ライブラリの`Store.error_type`は、この保存層が返す具体的なエラー型です。別のmoduleとして読み込んだ
+同じ保存層でも、その宣言に従って分類します。試験用のラッパーや独自の保存層を渡す場合は、返す型を
+同じclass属性で明示してください。型名や`exit_code`属性だけの一致から、確定した矛盾とは判断しません。
 
 **DB全体の巻き戻し、同じOSユーザーや管理者による改変、失われたDBの正当な復旧、世界全体の最新世代、独立した時刻証明は扱いません。** 保存されたDBそのものが古い状態へ戻れば、世代と失効記録も一緒に戻ります。これを負の対照として試験します。ローカル時計の検証中の後退は検出しますが、過去に設定された時計や外部時刻とのずれは検出できません。
 
@@ -71,3 +101,4 @@ python3 -I -B examples/receiver-state/test_integration.py -v
 前者は保存・policyとstubを使った制御経路の試験です。暗号検証の試験とは区別します。後者は既存の8/10ケースを実行し、実際に署名したreceiptを使って、保存・再起動相当の再接続・旧世代の拒否・鍵失効・新鍵への更新・改変データ拒否を確認します。合成実験であって、第三者による独立実装ではありません。
 
 実装上の参考：SQLiteの[トランザクションと読み取りsnapshot](https://www.sqlite.org/lang_transaction.html)、Pythonの[sqlite3](https://docs.python.org/3/library/sqlite3.html)。
+

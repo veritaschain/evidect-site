@@ -115,9 +115,30 @@ class ObserverTest(unittest.TestCase):
                 observer.manifest(value)
 
     def test_duplicate_json_nan_and_invalid_utf8_rejected(self):
-        for raw in (b'{"x":1,"x":2}', b'{"x":NaN}', b'\xff', b'\xef\xbb\xbf{}'):
-            with self.assertRaises(observer.ObservationError):
+        cases = ((b'{"x":1,"x":2}', "DUPLICATE_JSON_KEY"), (b'{"x":NaN}', "NONFINITE_JSON"),
+                 (b'\xff', "INVALID_JSON_OR_UTF8"), (b'\xef\xbb\xbf{}', "INVALID_JSON_OR_UTF8"))
+        for raw, reason in cases:
+            with self.subTest(reason=reason), self.assertRaises(observer.ObservationError) as raised:
                 observer.strict_json(raw)
+            self.assertEqual(str(raised.exception), reason)
+
+    def test_numeric_conversion_rejects_nonfinite_and_normalizes_integer_limit(self):
+        for token in (b'NaN', b'Infinity', b'-Infinity', b'1e999', b'-1e999', b'1.0e9999'):
+            with self.subTest(token=token), self.assertRaises(observer.ObservationError) as raised:
+                observer.strict_json(b'{"nested":[{"number":' + token + b'}]}')
+            self.assertEqual(str(raised.exception), "NONFINITE_JSON")
+        if hasattr(sys, "get_int_max_str_digits") and hasattr(sys, "set_int_max_str_digits"):
+            original_limit = sys.get_int_max_str_digits()
+            try:
+                sys.set_int_max_str_digits(4300)
+                with self.assertRaises(observer.ObservationError) as raised:
+                    observer.strict_json(b'{"number":' + b'9' * 4301 + b'}')
+                self.assertEqual(str(raised.exception), "INVALID_JSON_OR_UTF8")
+            finally:
+                sys.set_int_max_str_digits(original_limit)
+        finite = observer.strict_json(b'{"fraction":1.25,"exponent":1e2,"large_integer":9007199254740992}')
+        self.assertEqual(finite, {"fraction": 1.25, "exponent": 100.0, "large_integer": 2**53})
+        self.assertIs(type(finite["large_integer"]), int)
 
     def test_size_depth_and_unknown_fields_rejected(self):
         for raw in (b' ' * (observer.MAX_JSON + 1), b'[' * 2000 + b']' * 2000):

@@ -20,9 +20,17 @@ StateError, Store = state.StateError, state.Store
 PATHS = {"runtime": "examples/runtime-boundaries/handoff.py",
          "routing": "examples/execution-authorization/service-routing/handoff.py"}
 FORMAT = "evidect-stateful-receiver/1"
+ADAPTER_FORMATS = {"runtime": "evidect-runtime-receiver/2",
+                   "routing": "evidect-service-routing-receiver/2",
+                   "credential": "evidect-credential-receiver/1"}
+ADAPTER_ERRORS = {"runtime": "RuntimeHandoffError", "routing": "RoutingHandoffError"}
 
 
 def load_adapter(kind):
+    if kind == "credential":
+        # This kind requires separately selected credential trust and inventory.
+        # Its dedicated CLI supplies an explicitly configured adapter instance.
+        raise StateError("CREDENTIAL_ADAPTER_REQUIRES_SELECTED_TRUST")
     if type(kind) is not str or kind not in PATHS:
         raise StateError("STREAM_IDENTITY_INVALID")
     spec = importlib.util.spec_from_file_location("evidect_stateful_" + kind, REPO / PATHS[kind])
@@ -42,9 +50,18 @@ def sample_time(clock):
 
 
 def _invoke(adapter, package, report, public_key, pin, now, kind):
-    result = adapter.verify_delivery(package, report, public_key, pin, now=now)
-    if type(result) is not dict or result.get("format") != "evidect-" + (
-            "runtime" if kind == "runtime" else "service-routing") + "-receiver/2":
+    try:
+        result = adapter.verify_delivery(package, report, public_key, pin, now=now)
+    except ValueError as error:
+        error_name = ADAPTER_ERRORS.get(kind)
+        # These are explicit errors from the receiver-selected adapter. An
+        # arbitrary ValueError or exit_code attribute does not establish INVALID.
+        if error_name is None or type(error) is not getattr(adapter, error_name, None):
+            raise
+        if type(error.exit_code) is int and error.exit_code == 1:
+            raise StateError("ADAPTER_INPUT_INVALID", 1) from None
+        raise StateError("ADAPTER_VERIFIER_UNAVAILABLE") from None
+    if kind not in ADAPTER_FORMATS or type(result) is not dict or result.get("format") != ADAPTER_FORMATS[kind]:
         raise StateError("RECEIVER_CONTRACT_CHANGED")
     if result.get("local_status") not in ("VALID", "INVALID", "INDETERMINATE") or result.get("overall_status") not in ("INVALID", "INDETERMINATE"):
         raise StateError("RECEIVER_CONTRACT_CHANGED")
@@ -97,17 +114,37 @@ def verify(store, adapter, stream, kind, package, report, *, clock=time.time):
     checked = _invoke(adapter, package, report, selected["public_key"], selected["checkpoint"], start, kind)
     # Use a new transaction after crypto/semantic verification. Do not compare
     # against the original read transaction, which would retain its old snapshot.
-    current = store.select(stream, kind)
-    end = sample_time(clock)
     reason, policy = "CURRENT_LOCAL_SELECTION", "VALID"
-    if current["revoked"] and current["checkpoint"]["key_fingerprint"] == selected["checkpoint"]["key_fingerprint"]:
-        reason, policy = "KEY_REVOKED", "INVALID"
-    elif (current["store_id"], current["revision"]) != (selected["store_id"], selected["revision"]):
-        reason, policy = "STATE_CHANGED_DURING_VERIFICATION", "INDETERMINATE"
-    elif end < start:
-        reason, policy = "LOCAL_CLOCK_REGRESSED", "INDETERMINATE"
-    elif end >= selected["checkpoint"]["expires_at"]:
-        reason, policy = "CHECKPOINT_EXPIRED", "INDETERMINATE"
+    try:
+        current = store.select(stream, kind, checked_fingerprint=selected["checkpoint"]["key_fingerprint"])
+    except ValueError as error:
+        # Independently loaded stores own distinct error classes. Classify only
+        # the concrete type declared by this caller-selected local store.
+        if type(error) is not getattr(type(store), "error_type", None):
+            raise
+        # A failed final read cannot discard verification already completed
+        # under the adopted key, or reinterpret a known contradiction as unknown.
+        reason, policy = (("FINAL_STATE_INVALID", "INVALID") if type(error.exit_code) is int and error.exit_code == 1
+                          else ("FINAL_STATE_UNAVAILABLE", "INDETERMINATE"))
+    else:
+        if current["checked_key_revoked"]:
+            reason, policy = "KEY_REVOKED", "INVALID"
+        elif (current["store_id"], current["revision"]) != (selected["store_id"], selected["revision"]):
+            reason, policy = "STATE_CHANGED_DURING_VERIFICATION", "INDETERMINATE"
+    end = None
+    try:
+        end = sample_time(clock)
+    except StateError:
+        # No completion time was obtained. Keep any previously observed state
+        # failure (including revocation) and let the evidence verdict dominate.
+        if policy == "VALID":
+            reason, policy = "LOCAL_CLOCK_UNAVAILABLE", "INDETERMINATE"
+    else:
+        if policy == "VALID":
+            if end < start:
+                reason, policy = "LOCAL_CLOCK_REGRESSED", "INDETERMINATE"
+            elif end >= selected["checkpoint"]["expires_at"]:
+                reason, policy = "CHECKPOINT_EXPIRED", "INDETERMINATE"
     statuses = (policy, checked["local_status"])
     local = "INVALID" if "INVALID" in statuses else "INDETERMINATE" if "INDETERMINATE" in statuses else "VALID"
     return _result(selected, local, reason, start, end, checked)
