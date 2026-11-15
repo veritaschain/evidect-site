@@ -1,10 +1,29 @@
 # AIを用いた侵害・モデル切替・銀行アクセスの検証メモ
 
-**確認日：2026-11-01 JST。Informative / 非規範。**
+**初版確認日：2026-11-01 JST。Informative / 非規範。**
 
 このメモは、公表された情報と、そこから導く設計上の問いを分けて記録します。
 事件の実データ、マルウェア、資格情報、銀行口座を取得・実行していません。
 EVIDECTの合成実験による成功は、以下の事件の再現、防止、原因特定を意味しません。
+
+## 2026-11-09追記：Chainalysisの被害範囲更新
+
+**§1に残す10月30日の初報は履歴である。認証情報・セッショントークンへのアクセスの
+証拠がないという当時の評価は、11月4日の続報により更新された。**
+[同社の公式事故報告（11月7日更新）][chainalysis]で、次の内容を確認した。
+
+- 11月4日23:00 EST（11月5日13:00 JST）の公表では、11月2日に、全ユーザーに関係する
+  氏名、ユーザー名、パスワードハッシュ、有効トークンの露出を発見したと説明している。
+- 同日9:50 ESTの別更新は、通信経路上の攻撃による**一部顧客のパスワード**の露出を説明する。
+  全ユーザーの平文パスワードや、すべての認証要素・MFA秘密の侵害が確認されたとは記述しない。
+- KYTの一部アカウントには不正アクセスがあったとみられ、対象顧客へ個別通知している。
+  調査データへのアクセスや帰属データの改変については、同社は引き続き証拠がないとしている。
+- 11月7日13:50 EST（11月8日3:50 JST）に復旧を公表した対象はReactor、KYTのUI/API、
+  Address Screeningである。この更新だけでData SolutionsやChain (Beta)の復旧まで確定しない。
+
+使用モデルや自律実行の範囲、ログ不足が原因だったとの説明は確認していない。
+認証状態の変化と操作を関連付ける必要性は設計上の推論であり、この事件の原因認定や
+EVIDECTの実装・防止効果を示すものではない。§3の秘密情報を監査ログへ複製しない方針も維持する。
 
 ## 1. 何を確認できたか
 
@@ -154,6 +173,8 @@ their actual scope. Service permission, model-routing observation, truthful coll
 remain separate. The three proposals were unimplemented in the initial documentation change.
 The same-day follow-up above links a synthetic service-routing experiment and a consistent-forgery
 negative control; neither establishes live service permission or truthful observation.
+The 2026-11-09 follow-up supersedes the initial Chainalysis credential/token assessment;
+the October 30 disclosure remains below it as historical context, not the current impact assessment.
 
 [chainalysis]: https://www.chainalysis.com/blog/security-incident-october-30/
 [talos]: https://blog.talosintelligence.com/appraisal-by-ai-model-driven-victim-prioritization-in-the-volta-infostealer/
